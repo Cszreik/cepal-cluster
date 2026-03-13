@@ -1,0 +1,8 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Arial Narrow', Arial, Helvetica, sans-serif; background: #F5F6F7; color: #000; -webkit-font-smoothing: antialiased; }
+@keyframes spin { to { transform: rotate(360deg); } }
+select:focus, input:focus { border-color: #009bc2 !important; box-shadow: 0 0 0 2px rgba(0,155,194,0.2); outline: none; }
+button:hover { opacity: 0.9; }
+::-webkit-scrollbar { height: 6px; width: 6px; }
+::-webkit-scrollbar-track { background: #e8e8e8; }
+::-webkit-scrollbar-thumb { background: #b2b2b2; border-radius: 3px; }
