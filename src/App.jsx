@@ -253,10 +253,10 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
           <table style={F.table}>
             <thead>
               <tr>
-                <th style={{ ...F.th, position: "sticky", left: 0, zIndex: 4, minWidth: 120, background: "#354A5F" }} rowSpan={2}>Oficina</th>
-                <th style={{ ...F.th, position: "sticky", left: 120, zIndex: 4, minWidth: 110, background: "#354A5F" }} rowSpan={2}>Escritorio</th>
+                <th style={{ ...F.th, position: "sticky", left: 0, zIndex: 4, minWidth: 100, background: "#354A5F" }} rowSpan={2}>Oficina</th>
+                <th style={{ ...F.th, position: "sticky", left: 100, zIndex: 4, minWidth: 100, background: "#354A5F" }} rowSpan={2}>Escritorio</th>
                 {DAYS.map((d, i) => (
-                  <th key={i} colSpan={2} style={{ ...F.th, textAlign: "center", minWidth: 220, background: i === todayDayIdx ? G.red : "#354A5F", borderLeft: "1px solid rgba(255,255,255,0.15)" }}>
+                  <th key={i} colSpan={2} style={{ ...F.th, textAlign: "center", minWidth: 160, background: i === todayDayIdx ? G.red : "#354A5F", borderLeft: "1px solid rgba(255,255,255,0.15)" }}>
                     <div>{d}</div><div style={{ fontWeight: 400, fontSize: 10, opacity: 0.7 }}>{fmtDate(weekDates[i])}</div>
                   </th>
                 ))}
@@ -283,10 +283,10 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                         <td style={{ ...F.td, position: "sticky", left: 0, fontWeight: 700, background: blocked ? "#FFF3F0" : "#F5F6F7", borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 2 }}
                           rowSpan={offDesks.length}>{office}</td>
                       )}
-                      <td style={{ ...F.td, position: "sticky", left: 120, background: blocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white, borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 1 }}>
+                      <td style={{ ...F.td, position: "sticky", left: 100, background: blocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white, borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 1 }}>
                         {desk.desk}
-                        {desk.status === "reserved" && <span style={{ ...F.statusBadge, background: "#FFF3F0", color: G.red }}>Res.</span>}
-                        {desk.status === "maintenance" && <span style={{ ...F.statusBadge, background: G.yellowBg, color: "#8A6D00" }}>Mant.</span>}
+                        {desk.status === "reserved" && <span style={{ ...F.statusBadge, background: "#FFF3F0", color: G.red }}>Reservado.</span>}
+                        {desk.status === "maintenance" && <span style={{ ...F.statusBadge, background: G.yellowBg, color: "#8A6D00" }}>Mantención.</span>}
                       </td>
                       {DAYS.map((_, dayIdx) =>
                         PERIODS.map(period => {
@@ -516,7 +516,7 @@ const F = {
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "inherit" },
   th: { padding: "10px 12px", textAlign: "left", fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.8, color: G.white, background: "#354A5F" },
   td: { padding: "8px 12px", borderBottom: "1px solid #EEE", fontSize: 13 },
-  selectSmall: { width: "100%", padding: "5px 4px", border: "1px solid #DEE2E6", borderRadius: 3, fontSize: 11, cursor: "pointer", outline: "none", fontFamily: "inherit", transition: "border-color 0.15s" },
+  selectSmall: { width: "100%", padding: "5px 2px", border: "1px solid #DEE2E6", borderRadius: 3, fontSize: 10, cursor: "pointer", outline: "none", fontFamily: "inherit", transition: "border-color 0.15s", textAlign: "center" },
   fieldSelect: { padding: "7px 12px", border: "1px solid #DEE2E6", borderRadius: 4, fontSize: 13, fontFamily: "inherit", minWidth: 140, background: G.white },
   input: { padding: "7px 12px", border: "1px solid #DEE2E6", borderRadius: 4, fontSize: 13, fontFamily: "inherit", flex: 1, minWidth: 100, outline: "none" },
   pill: { display: "inline-block", padding: "2px 8px", borderRadius: 4, background: "#E5F0FF", color: G.blue, fontWeight: 700, fontSize: 11, marginRight: 6 },
