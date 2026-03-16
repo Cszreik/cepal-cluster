@@ -259,7 +259,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={F.cardHeader}>
           <span style={F.cardHeaderText}>Asignación de Escritorios</span>
-          <span style={{ fontSize: 11, color: G.grayDk, marginLeft: 12 }}>AM = mañana · PM = tarde · Click 📝 para agregar nota</span>
+          <span style={{ fontSize: 11, color: G.grayDk, marginLeft: 12 }}>AM = mañana · PM = tarde · Doble click en celda para agregar nota</span>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={F.table}>
@@ -317,7 +317,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                               {blocked ? (
                                 <div style={{ textAlign: "center", color: G.grayMid, fontSize: 12 }}>—</div>
                               ) : (
-                                <div style={{ position: "relative" }}>
+                                <div onDoubleClick={() => person && editNote(desk.id, dayIdx, period)} title={note ? `Nota: ${note}` : ""}>
                                   <select value={pid || ""} onChange={e => setCell(desk.id, dayIdx, period, e.target.value)} style={{
                                     ...F.selectSmall,
                                     borderColor: person ? (isAM ? G.cyan : G.purple) : "#DEE2E6",
@@ -329,18 +329,14 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                                     {activePeople.map(p => <option key={p.id} value={p.id}>{p.initials}</option>)}
                                   </select>
                                   {person && (
-                                    <button onClick={() => editNote(desk.id, dayIdx, period)}
-                                      title={note ? `Nota: ${note}` : "Agregar nota"}
-                                      style={{
-                                        position: "absolute", top: -2, right: -2,
-                                        width: 16, height: 16, borderRadius: "50%",
-                                        border: "none", cursor: "pointer", fontSize: 8, lineHeight: "16px",
-                                        textAlign: "center", padding: 0, zIndex: 1,
-                                        background: note ? G.gold : "#DEE2E6",
-                                        color: note ? G.black : G.grayDk,
-                                      }}>
-                                      {note ? "📝" : "·"}
-                                    </button>
+                                    <div title={note} style={{
+                                      marginTop: 2, padding: "1px 4px", borderRadius: 2,
+                                      background: G.yellowBg, fontSize: 9, color: "#8A6D00",
+                                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                      maxWidth: "100%", textAlign: "center", cursor: "pointer",
+                                    }} onClick={() => editNote(desk.id, dayIdx, period)}>
+                                      {note}
+                                    </div>
                                   )}
                                 </div>
                               )}
