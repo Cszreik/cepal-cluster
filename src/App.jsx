@@ -139,12 +139,15 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
   const monday = new Date(currentWeek + "T00:00:00");
   const weekDates = DAYS.map((_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
 
-  const weekRecords = useMemo(() => {
-    const map = {};
+  // Build maps for person assignments and notes
+  const { weekRecords, weekNotes } = useMemo(() => {
+    const rec = {}, notes = {};
     attendance.filter(a => a.week_key === currentWeek).forEach(a => {
-      map[`${a.desk_id}_${a.day_index}_${a.period}`] = a.person_id;
+      const k = `${a.desk_id}_${a.day_index}_${a.period}`;
+      rec[k] = a.person_id;
+      notes[k] = a.notes || "";
     });
-    return map;
+    return { weekRecords: rec, weekNotes: notes };
   }, [attendance, currentWeek]);
 
   const isCurrent = isCurrentWeek(currentWeek);
@@ -168,6 +171,17 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     setSaving(false);
   };
 
+  const editNote = async (deskId, dayIdx, period) => {
+    const key = `${deskId}_${dayIdx}_${period}`;
+    if (!weekRecords[key]) return; // must have a person assigned first
+    const current = weekNotes[key] || "";
+    const note = prompt("Nota para este turno:", current);
+    if (note === null) return; // cancelled
+    await supabase.from("attendance").update({ notes: note })
+      .eq("week_key", currentWeek).eq("day_index", dayIdx)
+      .eq("desk_id", deskId).eq("period", period);
+  };
+
   const changeWeek = (offset) => {
     const m = new Date(monday); m.setDate(m.getDate() + offset * 7);
     const nk = weekKey(m);
@@ -180,9 +194,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
   const totalSlotsPerDay = availDesks.length * 2;
   const occByDay = DAYS.map((_, dayIdx) => {
     let count = 0;
-    availDesks.forEach(d => {
-      PERIODS.forEach(p => { if (weekRecords[`${d.id}_${dayIdx}_${p}`]) count++; });
-    });
+    availDesks.forEach(d => { PERIODS.forEach(p => { if (weekRecords[`${d.id}_${dayIdx}_${p}`]) count++; }); });
     return count;
   });
   const totalOcc = occByDay.reduce((a, b) => a + b, 0);
@@ -247,7 +259,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={F.cardHeader}>
           <span style={F.cardHeaderText}>Asignación de Escritorios</span>
-          <span style={{ fontSize: 11, color: G.grayDk, marginLeft: 12 }}>AM = mañana · PM = tarde</span>
+          <span style={{ fontSize: 11, color: G.grayDk, marginLeft: 12 }}>AM = mañana · PM = tarde · Click 📝 para agregar nota</span>
         </div>
         <div style={{ overflowX: "auto" }}>
           <table style={F.table}>
@@ -285,14 +297,15 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                       )}
                       <td style={{ ...F.td, position: "sticky", left: 100, background: blocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white, borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 1 }}>
                         {desk.desk}
-                        {desk.status === "reserved" && <span style={{ ...F.statusBadge, background: "#FFF3F0", color: G.red }}>Reservado.</span>}
-                        {desk.status === "maintenance" && <span style={{ ...F.statusBadge, background: G.yellowBg, color: "#8A6D00" }}>Mantención.</span>}
+                        {desk.status === "reserved" && <span style={{ ...F.statusBadge, background: "#FFF3F0", color: G.red }}>Reservado</span>}
+                        {desk.status === "maintenance" && <span style={{ ...F.statusBadge, background: G.yellowBg, color: "#8A6D00" }}>Mantención</span>}
                       </td>
                       {DAYS.map((_, dayIdx) =>
                         PERIODS.map(period => {
                           const key = `${desk.id}_${dayIdx}_${period}`;
                           const pid = weekRecords[key];
                           const person = people.find(p => p.id === pid);
+                          const note = weekNotes[key];
                           const isToday = dayIdx === todayDayIdx;
                           const isAM = period === "AM";
                           return (
@@ -304,16 +317,32 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                               {blocked ? (
                                 <div style={{ textAlign: "center", color: G.grayMid, fontSize: 12 }}>—</div>
                               ) : (
-                                <select value={pid || ""} onChange={e => setCell(desk.id, dayIdx, period, e.target.value)} style={{
-                                  ...F.selectSmall,
-                                  borderColor: person ? (isAM ? G.cyan : G.purple) : "#DEE2E6",
-                                  background: person ? (isAM ? "#EBF8FA" : "#F3EFF7") : G.white,
-                                  color: person ? (isAM ? "#004E66" : "#4A3560") : G.grayDk,
-                                  fontWeight: person ? 700 : 400,
-                                }}>
-                                  <option value="">—</option>
-                                  {activePeople.map(p => <option key={p.id} value={p.id}>{p.initials}</option>)}
-                                </select>
+                                <div style={{ position: "relative" }}>
+                                  <select value={pid || ""} onChange={e => setCell(desk.id, dayIdx, period, e.target.value)} style={{
+                                    ...F.selectSmall,
+                                    borderColor: person ? (isAM ? G.cyan : G.purple) : "#DEE2E6",
+                                    background: person ? (isAM ? "#EBF8FA" : "#F3EFF7") : G.white,
+                                    color: person ? (isAM ? "#004E66" : "#4A3560") : G.grayDk,
+                                    fontWeight: person ? 700 : 400,
+                                  }}>
+                                    <option value="">—</option>
+                                    {activePeople.map(p => <option key={p.id} value={p.id}>{p.initials}</option>)}
+                                  </select>
+                                  {person && (
+                                    <button onClick={() => editNote(desk.id, dayIdx, period)}
+                                      title={note ? `Nota: ${note}` : "Agregar nota"}
+                                      style={{
+                                        position: "absolute", top: -2, right: -2,
+                                        width: 16, height: 16, borderRadius: "50%",
+                                        border: "none", cursor: "pointer", fontSize: 8, lineHeight: "16px",
+                                        textAlign: "center", padding: 0, zIndex: 1,
+                                        background: note ? G.gold : "#DEE2E6",
+                                        color: note ? G.black : G.grayDk,
+                                      }}>
+                                      {note ? "📝" : "·"}
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
                           );
@@ -366,9 +395,9 @@ function HistorialTab({ db }) {
         <div style={F.cardHeader}><span style={F.cardHeaderText}>Registros</span></div>
         <div style={{ overflowX: "auto" }}>
           <table style={F.table}>
-            <thead><tr>{["Semana", "Día", "Fecha", "Turno", "Oficina", "Escritorio", "Persona"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Semana", "Día", "Fecha", "Turno", "Oficina", "Escritorio", "Persona", "Nota"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
             <tbody>
-              {filtered.length === 0 ? <tr><td colSpan={7} style={{ ...F.td, textAlign: "center", padding: 48, color: G.grayDk }}>Sin registros.</td></tr> :
+              {filtered.length === 0 ? <tr><td colSpan={8} style={{ ...F.td, textAlign: "center", padding: 48, color: G.grayDk }}>Sin registros.</td></tr> :
               filtered.map((r, i) => (
                 <tr key={r.id} style={{ background: i % 2 === 0 ? "#FAFBFC" : G.white }}>
                   <td style={F.td}>{fmtWeek(new Date(r.week_key + "T00:00:00"))}</td>
@@ -376,6 +405,7 @@ function HistorialTab({ db }) {
                   <td style={F.td}><span style={{ ...F.badge, background: r.period === "AM" ? G.cyanBg : G.purpleBg, color: r.period === "AM" ? G.blue : G.purple, fontSize: 10 }}>{r.period}</span></td>
                   <td style={{ ...F.td, fontWeight: 600 }}>{r.dk.office}</td><td style={F.td}>{r.dk.desk}</td>
                   <td style={F.td}><span style={F.pill}>{r.pe.initials}</span> {r.pe.name}</td>
+                  <td style={{ ...F.td, fontSize: 11, color: G.grayDk, fontStyle: r.notes ? "normal" : "italic" }}>{r.notes || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -442,43 +472,134 @@ function DashboardTab({ db }) {
 /* ═══ CONFIG ═══ */
 function ConfigTab({ db }) {
   const { people, desks } = db;
-  const [nP, setNP] = useState({ initials: "", name: "", area: "" });
-  const [showAdd, setShowAdd] = useState(false);
-  const [busy, setBusy] = useState(false);
 
-  const add = async () => { if (!nP.initials||!nP.name) return; setBusy(true); await supabase.from("people").insert({ initials: nP.initials, name: nP.name, area: nP.area, active: true }); setNP({ initials: "", name: "", area: "" }); setShowAdd(false); setBusy(false); };
-  const toggle = async (id, a) => { await supabase.from("people").update({ active: !a }).eq("id", id); };
-  const remove = async (id) => { if (confirm("¿Eliminar?")) await supabase.from("people").delete().eq("id", id); };
-  const cycle = async (id, s) => { await supabase.from("desks").update({ status: s === "available" ? "reserved" : s === "reserved" ? "maintenance" : "available" }).eq("id", id); };
+  // People state
+  const [nP, setNP] = useState({ initials: "", name: "", area: "" });
+  const [showAddPerson, setShowAddPerson] = useState(false);
+  const [busyP, setBusyP] = useState(false);
+
+  // Desk state
+  const [nD, setND] = useState({ office: "", desk: "" });
+  const [showAddDesk, setShowAddDesk] = useState(false);
+  const [busyD, setBusyD] = useState(false);
+
+  // People CRUD
+  const addPerson = async () => {
+    if (!nP.initials || !nP.name) return;
+    setBusyP(true);
+    await supabase.from("people").insert({ initials: nP.initials, name: nP.name, area: nP.area, active: true });
+    setNP({ initials: "", name: "", area: "" }); setShowAddPerson(false); setBusyP(false);
+  };
+  const togglePerson = async (id, a) => { await supabase.from("people").update({ active: !a }).eq("id", id); };
+  const removePerson = async (id) => { if (confirm("¿Eliminar esta persona?")) await supabase.from("people").delete().eq("id", id); };
+
+  // Desk CRUD
+  const addDesk = async () => {
+    if (!nD.office || !nD.desk) return;
+    setBusyD(true);
+    const maxSort = desks.length > 0 ? Math.max(...desks.map(d => d.sort_order || 0)) + 1 : 1;
+    await supabase.from("desks").insert({ office: nD.office, desk: nD.desk, status: "available", sort_order: maxSort });
+    setND({ office: "", desk: "" }); setShowAddDesk(false); setBusyD(false);
+  };
+  const cycleDesk = async (id, s) => {
+    await supabase.from("desks").update({ status: s === "available" ? "reserved" : s === "reserved" ? "maintenance" : "available" }).eq("id", id);
+  };
+  const removeDesk = async (id) => {
+    if (confirm("¿Eliminar este escritorio? Se borrarán también sus registros de asistencia.")) {
+      await supabase.from("desks").delete().eq("id", id);
+    }
+  };
+  const renameDesk = async (id, field) => {
+    const desk = desks.find(d => d.id === id);
+    if (!desk) return;
+    const current = field === "office" ? desk.office : desk.desk;
+    const label = field === "office" ? "Nombre de oficina" : "Nombre de escritorio";
+    const val = prompt(`${label}:`, current);
+    if (val === null || val === current || !val.trim()) return;
+    await supabase.from("desks").update({ [field]: val.trim() }).eq("id", id);
+  };
+
   const stM = { available: { l: "Disponible", bg: "#E8F5E9", c: G.green }, reserved: { l: "Reservado", bg: "#FFF3F0", c: G.red }, maintenance: { l: "Mantención", bg: G.yellowBg, c: "#8A6D00" } };
+
+  // Get unique offices for the dropdown hint
+  const uniqueOffices = [...new Set(desks.map(d => d.office))];
 
   return (
     <div>
+      {/* ─── People section ─── */}
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={{ ...F.cardHeader, display: "flex", justifyContent: "space-between" }}>
-          <span style={F.cardHeaderText}>Personas</span>
-          <button onClick={() => setShowAdd(!showAdd)} style={{ ...F.primaryBtn, padding: "6px 14px", fontSize: 12, background: showAdd ? G.grayDk : G.blue }}>{showAdd ? "✕ Cancelar" : "+ Agregar"}</button>
+          <span style={F.cardHeaderText}>Personas Registradas</span>
+          <button onClick={() => setShowAddPerson(!showAddPerson)} style={{ ...F.primaryBtn, padding: "6px 14px", fontSize: 12, background: showAddPerson ? G.grayDk : G.blue }}>
+            {showAddPerson ? "✕ Cancelar" : "+ Agregar Persona"}
+          </button>
         </div>
-        {showAdd && <div style={{ display: "flex", gap: 8, padding: "12px 16px", background: "#F5F6F7", borderBottom: `1px solid ${G.grayBg}`, flexWrap: "wrap" }}>
+        {showAddPerson && <div style={{ display: "flex", gap: 8, padding: "12px 16px", background: "#F5F6F7", borderBottom: `1px solid ${G.grayBg}`, flexWrap: "wrap" }}>
           <input placeholder="Iniciales" value={nP.initials} onChange={e => setNP({ ...nP, initials: e.target.value.toUpperCase() })} style={F.input} maxLength={5} />
           <input placeholder="Nombre" value={nP.name} onChange={e => setNP({ ...nP, name: e.target.value })} style={{ ...F.input, flex: 2 }} />
           <input placeholder="Área" value={nP.area} onChange={e => setNP({ ...nP, area: e.target.value })} style={F.input} />
-          <button onClick={add} disabled={busy} style={{ ...F.primaryBtn, background: G.green, opacity: busy ? 0.6 : 1 }}>{busy ? "..." : "Guardar"}</button>
+          <button onClick={addPerson} disabled={busyP} style={{ ...F.primaryBtn, background: G.green, opacity: busyP ? 0.6 : 1 }}>{busyP ? "..." : "Guardar"}</button>
         </div>}
-        <table style={F.table}><thead><tr>{["Inic.","Nombre","Área","Estado","Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
-          <tbody>{people.map((p,i) => (<tr key={p.id} style={{ background: i%2===0 ? "#FAFBFC" : G.white }}>
-            <td style={F.td}><span style={F.pill}>{p.initials}</span></td><td style={{ ...F.td, fontWeight: 600 }}>{p.name}</td><td style={F.td}>{p.area}</td>
-            <td style={F.td}><span style={{ ...F.statusBadge, background: p.active ? "#E8F5E9" : "#FFF3F0", color: p.active ? G.green : G.red, marginLeft: 0 }}>{p.active ? "Activo" : "Inactivo"}</span></td>
-            <td style={F.td}><button onClick={() => toggle(p.id, p.active)} style={F.linkBtn}>{p.active ? "Desactivar" : "Activar"}</button><button onClick={() => remove(p.id)} style={{ ...F.linkBtn, color: G.red }}>Eliminar</button></td>
-          </tr>))}</tbody></table>
+        <table style={F.table}><thead><tr>{["Inic.", "Nombre", "Área", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+          <tbody>{people.map((p, i) => (
+            <tr key={p.id} style={{ background: i % 2 === 0 ? "#FAFBFC" : G.white }}>
+              <td style={F.td}><span style={F.pill}>{p.initials}</span></td>
+              <td style={{ ...F.td, fontWeight: 600 }}>{p.name}</td>
+              <td style={F.td}>{p.area}</td>
+              <td style={F.td}><span style={{ ...F.statusBadge, background: p.active ? "#E8F5E9" : "#FFF3F0", color: p.active ? G.green : G.red, marginLeft: 0 }}>{p.active ? "Activo" : "Inactivo"}</span></td>
+              <td style={F.td}>
+                <button onClick={() => togglePerson(p.id, p.active)} style={F.linkBtn}>{p.active ? "Desactivar" : "Activar"}</button>
+                <button onClick={() => removePerson(p.id)} style={{ ...F.linkBtn, color: G.red }}>Eliminar</button>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
       </div>
+
+      {/* ─── Desks section ─── */}
       <div style={{ ...F.card, overflow: "hidden" }}>
-        <div style={F.cardHeader}><span style={F.cardHeaderText}>Oficinas</span><span style={{ fontSize: 11, color: G.grayDk, marginLeft: 12 }}>Click estado para rotar</span></div>
-        <table style={F.table}><thead><tr>{["Oficina","Escritorio","Estado"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
-          <tbody>{desks.map((d,i) => { const st = stM[d.status]; return (<tr key={d.id} style={{ background: i%2===0 ? "#FAFBFC" : G.white }}>
-            <td style={{ ...F.td, fontWeight: 600 }}>{d.office}</td><td style={F.td}>{d.desk}</td>
-            <td style={F.td}><button onClick={() => cycle(d.id, d.status)} style={{ ...F.statusBadge, border: "none", cursor: "pointer", background: st.bg, color: st.c, marginLeft: 0 }}>{st.l}</button></td>
-          </tr>); })}</tbody></table>
+        <div style={{ ...F.cardHeader, display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={F.cardHeaderText}>Oficinas y Escritorios</span>
+            <span style={{ fontSize: 11, color: G.grayDk }}>Click nombre para editar · Click estado para rotar</span>
+          </div>
+          <button onClick={() => setShowAddDesk(!showAddDesk)} style={{ ...F.primaryBtn, padding: "6px 14px", fontSize: 12, background: showAddDesk ? G.grayDk : G.blue }}>
+            {showAddDesk ? "✕ Cancelar" : "+ Agregar Escritorio"}
+          </button>
+        </div>
+        {showAddDesk && <div style={{ display: "flex", gap: 8, padding: "12px 16px", background: "#F5F6F7", borderBottom: `1px solid ${G.grayBg}`, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ fontSize: 11, color: G.grayDk, marginBottom: 4, fontWeight: 600 }}>Oficina</div>
+            <input list="office-list" placeholder="Ej: Oficina 210" value={nD.office} onChange={e => setND({ ...nD, office: e.target.value })} style={F.input} />
+            <datalist id="office-list">{uniqueOffices.map(o => <option key={o} value={o} />)}</datalist>
+          </div>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ fontSize: 11, color: G.grayDk, marginBottom: 4, fontWeight: 600 }}>Escritorio</div>
+            <input placeholder="Ej: Escritorio 3" value={nD.desk} onChange={e => setND({ ...nD, desk: e.target.value })} style={F.input} />
+          </div>
+          <button onClick={addDesk} disabled={busyD} style={{ ...F.primaryBtn, background: G.green, opacity: busyD ? 0.6 : 1 }}>{busyD ? "..." : "Guardar"}</button>
+        </div>}
+        <table style={F.table}><thead><tr>{["Oficina", "Escritorio", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+          <tbody>{desks.map((d, i) => {
+            const st = stM[d.status];
+            return (
+              <tr key={d.id} style={{ background: i % 2 === 0 ? "#FAFBFC" : G.white }}>
+                <td style={{ ...F.td, fontWeight: 600 }}>
+                  <button onClick={() => renameDesk(d.id, "office")} style={{ ...F.linkBtn, fontWeight: 600, padding: 0, fontSize: 13 }}>{d.office}</button>
+                </td>
+                <td style={F.td}>
+                  <button onClick={() => renameDesk(d.id, "desk")} style={{ ...F.linkBtn, padding: 0, fontSize: 13 }}>{d.desk}</button>
+                </td>
+                <td style={F.td}>
+                  <button onClick={() => cycleDesk(d.id, d.status)} style={{ ...F.statusBadge, border: "none", cursor: "pointer", background: st.bg, color: st.c, marginLeft: 0 }}>{st.l}</button>
+                </td>
+                <td style={F.td}>
+                  <button onClick={() => removeDesk(d.id)} style={{ ...F.linkBtn, color: G.red }}>Eliminar</button>
+                </td>
+              </tr>
+            );
+          })}</tbody>
+        </table>
       </div>
     </div>
   );
