@@ -505,6 +505,16 @@ function ConfigTab({ db }) {
       await supabase.from("desks").delete().eq("id", id);
     }
   };
+  const moveDesk = async (id, direction) => {
+    const idx = desks.findIndex(d => d.id === id);
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= desks.length) return;
+    const a = desks[idx], b = desks[swapIdx];
+    await Promise.all([
+      supabase.from("desks").update({ sort_order: b.sort_order }).eq("id", a.id),
+      supabase.from("desks").update({ sort_order: a.sort_order }).eq("id", b.id),
+    ]);
+  };
   const renameDesk = async (id, field) => {
     const desk = desks.find(d => d.id === id);
     if (!desk) return;
@@ -575,11 +585,15 @@ function ConfigTab({ db }) {
           </div>
           <button onClick={addDesk} disabled={busyD} style={{ ...F.primaryBtn, background: G.green, opacity: busyD ? 0.6 : 1 }}>{busyD ? "..." : "Guardar"}</button>
         </div>}
-        <table style={F.table}><thead><tr>{["Oficina", "Escritorio", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+        <table style={F.table}><thead><tr>{["Orden", "Oficina", "Escritorio", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
           <tbody>{desks.map((d, i) => {
             const st = stM[d.status];
             return (
               <tr key={d.id} style={{ background: i % 2 === 0 ? "#FAFBFC" : G.white }}>
+                <td style={{ ...F.td, textAlign: "center", whiteSpace: "nowrap" }}>
+                  <button onClick={() => moveDesk(d.id, -1)} disabled={i === 0} style={{ ...F.linkBtn, fontSize: 16, opacity: i === 0 ? 0.2 : 1 }}>▲</button>
+                  <button onClick={() => moveDesk(d.id, 1)} disabled={i === desks.length - 1} style={{ ...F.linkBtn, fontSize: 16, opacity: i === desks.length - 1 ? 0.2 : 1 }}>▼</button>
+                </td>
                 <td style={{ ...F.td, fontWeight: 600 }}>
                   <button onClick={() => renameDesk(d.id, "office")} style={{ ...F.linkBtn, fontWeight: 600, padding: 0, fontSize: 13 }}>{d.office}</button>
                 </td>
