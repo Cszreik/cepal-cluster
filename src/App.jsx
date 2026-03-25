@@ -27,7 +27,12 @@ function fmtWeek(d) {
 function weekKey(d) { return getMonday(d).toISOString().split("T")[0]; }
 function todayWeekKey() { return weekKey(new Date()); }
 function nextWeekKey() { const d = getMonday(new Date()); d.setDate(d.getDate() + 7); return d.toISOString().split("T")[0]; }
-function canGoForward(wk) { return wk < nextWeekKey(); }
+function canGoForward(wk) {
+  const today = new Date();
+  const isFridayOrLater = today.getDay() >= 5 || today.getDay() === 0;
+  const maxWeek = isFridayOrLater ? nextWeekKey() : todayWeekKey();
+  return wk < maxWeek;
+}
 function isCurrentWeek(wk) { return wk === todayWeekKey(); }
 function isNextWeek(wk) { return wk === nextWeekKey(); }
 
