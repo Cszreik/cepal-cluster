@@ -28,9 +28,11 @@ function weekKey(d) { return getMonday(d).toISOString().split("T")[0]; }
 function todayWeekKey() { return weekKey(new Date()); }
 function nextWeekKey() { const d = getMonday(new Date()); d.setDate(d.getDate() + 7); return d.toISOString().split("T")[0]; }
 function canGoForward(wk) {
-  const today = new Date();
-  const isFridayOrLater = today.getDay() >= 5 || today.getDay() === 0;
-  const maxWeek = isFridayOrLater ? nextWeekKey() : todayWeekKey();
+  const now = new Date();
+  const day = now.getDay();
+  const hour = now.getHours();
+  const unlocked = day > 5 || day === 0 || (day === 5 && hour >= 14);
+  const maxWeek = unlocked ? nextWeekKey() : todayWeekKey();
   return wk < maxWeek;
 }
 function isCurrentWeek(wk) { return wk === todayWeekKey(); }
@@ -149,7 +151,6 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
   const monday = new Date(currentWeek + "T00:00:00");
   const weekDates = DAYS.map((_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
 
-  // Build maps for person assignments and notes
   const { weekRecords, weekNotes } = useMemo(() => {
     const rec = {}, notes = {};
     attendance.filter(a => a.week_key === currentWeek).forEach(a => {
@@ -160,12 +161,14 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     return { weekRecords: rec, weekNotes: notes };
   }, [attendance, currentWeek]);
 
+  // Holiday lookup for this week's dates
   const dayHolidays = useMemo(() => {
     return weekDates.map(d => {
       const ds = toDateStr(d);
       return holidays.find(h => h.date === ds) || null;
     });
   }, [weekDates, holidays]);
+
   const isCurrent = isCurrentWeek(currentWeek);
   const isNext = isNextWeek(currentWeek);
   const isPast = !isCurrent && !isNext && currentWeek < todayWeekKey();
@@ -189,10 +192,10 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
 
   const editNote = async (deskId, dayIdx, period) => {
     const key = `${deskId}_${dayIdx}_${period}`;
-    if (!weekRecords[key]) return; // must have a person assigned first
+    if (!weekRecords[key]) return;
     const current = weekNotes[key] || "";
     const note = prompt("Nota para este turno:", current);
-    if (note === null) return; // cancelled
+    if (note === null) return;
     await supabase.from("attendance").update({ notes: note })
       .eq("week_key", currentWeek).eq("day_index", dayIdx)
       .eq("desk_id", deskId).eq("period", period);
@@ -249,6 +252,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
         </div>
       </div>
 
+      {/* Day occupation cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 16 }}>
         {DAYS.map((day, i) => {
           const hol = dayHolidays[i];
@@ -286,6 +290,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
         })}
       </div>
 
+      {/* Grid */}
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={F.cardHeader}>
           <span style={F.cardHeaderText}>Asignación de Escritorios</span>
@@ -310,13 +315,17 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
               </tr>
               <tr>
                 {DAYS.map((_, i) =>
-                  PERIODS.map(p => (
-                    <th key={`${i}_${p}`} style={{
-                      ...F.th, textAlign: "center", fontSize: 10, padding: "4px 6px",
-                      background: (dayHolidays[i] && ((p === "AM" && dayHolidays[i].block_am) || (p === "PM" && dayHolidays[i].block_pm))) ? "#B8960A" : i === todayDayIdx ? (p === "AM" ? "#a00c0c" : "#8a0a0a") : (p === "AM" ? "#2C3E50" : "#243342"),
-                      borderLeft: p === "AM" ? "1px solid rgba(255,255,255,0.15)" : "none", letterSpacing: 1.5,
-                    }}>{(dayHolidays[i] && ((p === "AM" && dayHolidays[i].block_am) || (p === "PM" && dayHolidays[i].block_pm))) ? "🏖" : p}</th>
-                  ))
+                  PERIODS.map(p => {
+                    const hol = dayHolidays[i];
+                    const isBlocked = hol && ((p === "AM" && hol.block_am) || (p === "PM" && hol.block_pm));
+                    return (
+                      <th key={`${i}_${p}`} style={{
+                        ...F.th, textAlign: "center", fontSize: 10, padding: "4px 6px",
+                        background: isBlocked ? "#B8960A" : i === todayDayIdx ? (p === "AM" ? "#a00c0c" : "#8a0a0a") : (p === "AM" ? "#2C3E50" : "#243342"),
+                        borderLeft: p === "AM" ? "1px solid rgba(255,255,255,0.15)" : "none", letterSpacing: 1.5,
+                      }}>{isBlocked ? "🏖" : p}</th>
+                    );
+                  })
                 )}
               </tr>
             </thead>
@@ -339,7 +348,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                         PERIODS.map(period => {
                           const hol = dayHolidays[dayIdx];
                           const holBlocked = hol && ((period === "AM" && hol.block_am) || (period === "PM" && hol.block_pm));
-                          const cellBlocked = deskBlocked || holBlocked;
+                          const blocked = deskBlocked || holBlocked;
                           const key = `${desk.id}_${dayIdx}_${period}`;
                           const pid = weekRecords[key];
                           const person = people.find(p => p.id === pid);
@@ -352,7 +361,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                               background: holBlocked ? G.yellowBg : deskBlocked ? "#FFF3F0" : isToday ? "#FFF8F6" : undefined,
                               borderLeft: isAM ? `1px solid ${G.grayBg}` : "none",
                             }}>
-                              {cellBlocked ? (
+                              {blocked ? (
                                 <div style={{ textAlign: "center", color: holBlocked ? "#8A6D00" : G.grayMid, fontSize: holBlocked ? 10 : 12, fontWeight: holBlocked ? 700 : 400 }}>
                                   {holBlocked ? "Feriado" : "—"}
                                 </div>
@@ -368,7 +377,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                                     <option value="">—</option>
                                     {activePeople.map(p => <option key={p.id} value={p.id}>{p.initials}</option>)}
                                   </select>
-                                  {person && (
+                                  {person && note && (
                                     <div title={note} style={{
                                       marginTop: 2, padding: "1px 4px", borderRadius: 2,
                                       background: G.yellowBg, fontSize: 9, color: "#8A6D00",
@@ -507,17 +516,19 @@ function DashboardTab({ db }) {
 
 /* ═══ CONFIG ═══ */
 function ConfigTab({ db }) {
-  const { people, desks } = db;
+  const { people, desks, holidays } = db;
 
-  // People state
   const [nP, setNP] = useState({ initials: "", name: "", area: "" });
   const [showAddPerson, setShowAddPerson] = useState(false);
   const [busyP, setBusyP] = useState(false);
 
-  // Desk state
   const [nD, setND] = useState({ office: "", desk: "" });
   const [showAddDesk, setShowAddDesk] = useState(false);
   const [busyD, setBusyD] = useState(false);
+
+  const [nH, setNH] = useState({ date: "", name: "", block_am: true, block_pm: true });
+  const [showAddHoliday, setShowAddHoliday] = useState(false);
+  const [busyH, setBusyH] = useState(false);
 
   // People CRUD
   const addPerson = async () => {
@@ -541,9 +552,16 @@ function ConfigTab({ db }) {
     await supabase.from("desks").update({ status: s === "available" ? "reserved" : s === "reserved" ? "maintenance" : "available" }).eq("id", id);
   };
   const removeDesk = async (id) => {
-    if (confirm("¿Eliminar este escritorio? Se borrarán también sus registros de asistencia.")) {
-      await supabase.from("desks").delete().eq("id", id);
-    }
+    if (confirm("¿Eliminar este escritorio?")) await supabase.from("desks").delete().eq("id", id);
+  };
+  const renameDesk = async (id, field) => {
+    const desk = desks.find(d => d.id === id);
+    if (!desk) return;
+    const current = field === "office" ? desk.office : desk.desk;
+    const label = field === "office" ? "Nombre de oficina" : "Nombre de escritorio";
+    const val = prompt(`${label}:`, current);
+    if (val === null || val === current || !val.trim()) return;
+    await supabase.from("desks").update({ [field]: val.trim() }).eq("id", id);
   };
   const moveDesk = async (id, direction) => {
     const idx = desks.findIndex(d => d.id === id);
@@ -555,24 +573,36 @@ function ConfigTab({ db }) {
       supabase.from("desks").update({ sort_order: a.sort_order }).eq("id", b.id),
     ]);
   };
-  const renameDesk = async (id, field) => {
-    const desk = desks.find(d => d.id === id);
-    if (!desk) return;
-    const current = field === "office" ? desk.office : desk.desk;
-    const label = field === "office" ? "Nombre de oficina" : "Nombre de escritorio";
-    const val = prompt(`${label}:`, current);
-    if (val === null || val === current || !val.trim()) return;
-    await supabase.from("desks").update({ [field]: val.trim() }).eq("id", id);
+
+  // Holiday CRUD
+  const addHoliday = async () => {
+    if (!nH.date || !nH.name) return;
+    setBusyH(true);
+    await supabase.from("holidays").insert({ date: nH.date, name: nH.name, block_am: nH.block_am, block_pm: nH.block_pm });
+    setNH({ date: "", name: "", block_am: true, block_pm: true }); setShowAddHoliday(false); setBusyH(false);
+  };
+  const removeHoliday = async (id) => {
+    if (confirm("¿Eliminar este feriado?")) await supabase.from("holidays").delete().eq("id", id);
+  };
+  const toggleHolidayPeriod = async (id, field) => {
+    const h = holidays.find(x => x.id === id);
+    if (!h) return;
+    const newVal = !h[field];
+    if (!newVal && !h[field === "block_am" ? "block_pm" : "block_am"]) return; // must block at least one
+    await supabase.from("holidays").update({ [field]: newVal }).eq("id", id);
   };
 
   const stM = { available: { l: "Disponible", bg: "#E8F5E9", c: G.green }, reserved: { l: "Reservado", bg: "#FFF3F0", c: G.red }, maintenance: { l: "Mantención", bg: G.yellowBg, c: "#8A6D00" } };
-
-  // Get unique offices for the dropdown hint
   const uniqueOffices = [...new Set(desks.map(d => d.office))];
+
+  // Split holidays into upcoming and past
+  const today = toDateStr(new Date());
+  const upcomingHolidays = holidays.filter(h => h.date >= today);
+  const pastHolidays = holidays.filter(h => h.date < today);
 
   return (
     <div>
-      {/* ─── People section ─── */}
+      {/* People */}
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={{ ...F.cardHeader, display: "flex", justifyContent: "space-between" }}>
           <span style={F.cardHeaderText}>Personas Registradas</span>
@@ -602,7 +632,7 @@ function ConfigTab({ db }) {
         </table>
       </div>
 
-      {/* ─── Desks section ─── */}
+      {/* Desks */}
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={{ ...F.cardHeader, display: "flex", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -649,6 +679,81 @@ function ConfigTab({ db }) {
               </tr>
             );
           })}</tbody>
+        </table>
+      </div>
+
+      {/* Holidays */}
+      <div style={{ ...F.card, overflow: "hidden" }}>
+        <div style={{ ...F.cardHeader, display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={F.cardHeaderText}>🏖 Feriados</span>
+            <span style={{ fontSize: 11, color: G.grayDk }}>Los días feriados se bloquean automáticamente en el registro</span>
+          </div>
+          <button onClick={() => setShowAddHoliday(!showAddHoliday)} style={{ ...F.primaryBtn, padding: "6px 14px", fontSize: 12, background: showAddHoliday ? G.grayDk : G.blue }}>
+            {showAddHoliday ? "✕ Cancelar" : "+ Agregar Feriado"}
+          </button>
+        </div>
+        {showAddHoliday && <div style={{ display: "flex", gap: 8, padding: "12px 16px", background: "#F5F6F7", borderBottom: `1px solid ${G.grayBg}`, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ minWidth: 150 }}>
+            <div style={{ fontSize: 11, color: G.grayDk, marginBottom: 4, fontWeight: 600 }}>Fecha</div>
+            <input type="date" value={nH.date} onChange={e => setNH({ ...nH, date: e.target.value })} style={F.input} />
+          </div>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ fontSize: 11, color: G.grayDk, marginBottom: 4, fontWeight: 600 }}>Nombre</div>
+            <input placeholder="Ej: Viernes Santo" value={nH.name} onChange={e => setNH({ ...nH, name: e.target.value })} style={F.input} />
+          </div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", paddingBottom: 2 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer", fontWeight: 600, color: nH.block_am ? G.cyan : G.grayMid }}>
+              <input type="checkbox" checked={nH.block_am} onChange={e => setNH({ ...nH, block_am: e.target.checked })} /> AM
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, cursor: "pointer", fontWeight: 600, color: nH.block_pm ? G.purple : G.grayMid }}>
+              <input type="checkbox" checked={nH.block_pm} onChange={e => setNH({ ...nH, block_pm: e.target.checked })} /> PM
+            </label>
+          </div>
+          <button onClick={addHoliday} disabled={busyH} style={{ ...F.primaryBtn, background: G.green, opacity: busyH ? 0.6 : 1 }}>{busyH ? "..." : "Guardar"}</button>
+        </div>}
+
+        {/* Upcoming holidays */}
+        <table style={F.table}><thead><tr>{["Fecha", "Nombre", "Bloquea", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+          <tbody>
+            {holidays.length === 0 ? (
+              <tr><td colSpan={4} style={{ ...F.td, textAlign: "center", padding: 32, color: G.grayDk }}>No hay feriados configurados.</td></tr>
+            ) : (
+              <>
+                {upcomingHolidays.length > 0 && upcomingHolidays.map((h, i) => (
+                  <tr key={h.id} style={{ background: i % 2 === 0 ? G.yellowBg : "#FFFDE0" }}>
+                    <td style={{ ...F.td, fontWeight: 600 }}>{new Date(h.date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</td>
+                    <td style={{ ...F.td, fontWeight: 600 }}>{h.name}</td>
+                    <td style={F.td}>
+                      <button onClick={() => toggleHolidayPeriod(h.id, "block_am")} style={{ ...F.statusBadge, border: "none", cursor: "pointer", marginLeft: 0, marginRight: 4, background: h.block_am ? G.cyanBg : G.grayBg, color: h.block_am ? G.blue : G.grayMid }}>AM</button>
+                      <button onClick={() => toggleHolidayPeriod(h.id, "block_pm")} style={{ ...F.statusBadge, border: "none", cursor: "pointer", marginLeft: 0, background: h.block_pm ? G.purpleBg : G.grayBg, color: h.block_pm ? G.purple : G.grayMid }}>PM</button>
+                    </td>
+                    <td style={F.td}>
+                      <button onClick={() => removeHoliday(h.id)} style={{ ...F.linkBtn, color: G.red }}>Eliminar</button>
+                    </td>
+                  </tr>
+                ))}
+                {pastHolidays.length > 0 && (
+                  <>
+                    <tr><td colSpan={4} style={{ ...F.td, fontSize: 11, color: G.grayDk, fontWeight: 700, background: "#F5F6F7", padding: "6px 12px" }}>Feriados pasados</td></tr>
+                    {pastHolidays.map((h, i) => (
+                      <tr key={h.id} style={{ background: i % 2 === 0 ? "#FAFBFC" : G.white, opacity: 0.6 }}>
+                        <td style={F.td}>{new Date(h.date + "T12:00:00").toLocaleDateString("es-CL", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</td>
+                        <td style={F.td}>{h.name}</td>
+                        <td style={F.td}>
+                          <span style={{ ...F.statusBadge, marginLeft: 0, marginRight: 4, background: h.block_am ? G.cyanBg : G.grayBg, color: h.block_am ? G.blue : G.grayMid }}>AM</span>
+                          <span style={{ ...F.statusBadge, marginLeft: 0, background: h.block_pm ? G.purpleBg : G.grayBg, color: h.block_pm ? G.purple : G.grayMid }}>PM</span>
+                        </td>
+                        <td style={F.td}>
+                          <button onClick={() => removeHoliday(h.id)} style={{ ...F.linkBtn, color: G.red }}>Eliminar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+          </tbody>
         </table>
       </div>
     </div>
