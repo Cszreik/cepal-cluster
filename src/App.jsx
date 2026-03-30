@@ -35,23 +35,26 @@ function canGoForward(wk) {
 }
 function isCurrentWeek(wk) { return wk === todayWeekKey(); }
 function isNextWeek(wk) { return wk === nextWeekKey(); }
+function toDateStr(d) { return d.toISOString().split("T")[0]; }
 
 function useDB() {
   const [people, setPeople] = useState([]);
   const [desks, setDesks] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const [p, d, a] = await Promise.all([
+      const [p, d, a, h] = await Promise.all([
         supabase.from("people").select("*").order("created_at"),
         supabase.from("desks").select("*").order("sort_order"),
         supabase.from("attendance").select("*"),
+        supabase.from("holidays").select("*").order("date"),
       ]);
       if (p.error) throw p.error;
-      setPeople(p.data); setDesks(d.data); setAttendance(a.data);
+      setPeople(p.data); setDesks(d.data); setAttendance(a.data); setHolidays(h.data || []);
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, []);
 
@@ -65,11 +68,13 @@ function useDB() {
         supabase.from("desks").select("*").order("sort_order").then(r => r.data && setDesks(r.data)))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () =>
         supabase.from("attendance").select("*").then(r => r.data && setAttendance(r.data)))
+      .on("postgres_changes", { event: "*", schema: "public", table: "holidays" }, () =>
+        supabase.from("holidays").select("*").order("date").then(r => r.data && setHolidays(r.data)))
       .subscribe();
     return () => supabase.removeChannel(ch);
   }, []);
 
-  return { people, desks, attendance, loading, error };
+  return { people, desks, attendance, holidays, loading, error };
 }
 
 export default function App() {
@@ -138,7 +143,7 @@ export default function App() {
 
 /* ═══ REGISTRO ═══ */
 function RegistroTab({ db, currentWeek, setCurrentWeek }) {
-  const { people, desks, attendance } = db;
+  const { people, desks, attendance, holidays } = db;
   const [saving, setSaving] = useState(false);
   const activePeople = people.filter(p => p.active);
   const monday = new Date(currentWeek + "T00:00:00");
@@ -155,6 +160,12 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     return { weekRecords: rec, weekNotes: notes };
   }, [attendance, currentWeek]);
 
+  const dayHolidays = useMemo(() => {
+    return weekDates.map(d => {
+      const ds = toDateStr(d);
+      return holidays.find(h => h.date === ds) || null;
+    });
+  }, [weekDates, holidays]);
   const isCurrent = isCurrentWeek(currentWeek);
   const isNext = isNextWeek(currentWeek);
   const isPast = !isCurrent && !isNext && currentWeek < todayWeekKey();
@@ -240,22 +251,36 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 16 }}>
         {DAYS.map((day, i) => {
+          const hol = dayHolidays[i];
+          const holAM = hol && hol.block_am;
+          const holPM = hol && hol.block_pm;
+          const fullHoliday = holAM && holPM;
           const pct = totalSlotsPerDay > 0 ? occByDay[i] / totalSlotsPerDay : 0;
           const isToday = i === todayDayIdx;
-          const c = pct >= 0.75 ? G.green : pct >= 0.4 ? G.gold : G.red;
+          const c = fullHoliday ? G.grayMid : pct >= 0.75 ? G.green : pct >= 0.4 ? G.gold : G.red;
           return (
-            <div key={i} style={{ ...F.card, padding: "10px 12px", marginBottom: 0, borderTop: isToday ? `3px solid ${G.red}` : "3px solid transparent" }}>
+            <div key={i} style={{ ...F.card, padding: "10px 12px", marginBottom: 0, borderTop: isToday ? `3px solid ${G.red}` : fullHoliday ? `3px solid ${G.gold}` : "3px solid transparent", background: fullHoliday ? G.yellowBg : G.white }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: isToday ? G.red : G.grayDk }}>{day}</span>
                 <span style={{ fontSize: 10, color: G.grayDk }}>{fmtDate(weekDates[i])}</span>
               </div>
-              <div style={{ height: 4, background: G.grayBg, borderRadius: 2, marginTop: 8 }}>
-                <div style={{ height: "100%", width: `${Math.max(pct * 100, 2)}%`, background: c, borderRadius: 2, transition: "width 0.3s" }} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                <span style={{ fontSize: 20, fontWeight: 800, color: c }}>{Math.round(pct * 100)}%</span>
-                <span style={{ fontSize: 11, color: G.grayDk, alignSelf: "flex-end" }}>{occByDay[i]}/{totalSlotsPerDay}</span>
-              </div>
+              {fullHoliday ? (
+                <div style={{ textAlign: "center", marginTop: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "#8A6D00" }}>FERIADO</div>
+                  <div style={{ fontSize: 10, color: "#8A6D00", marginTop: 2 }}>{hol.name}</div>
+                </div>
+              ) : (
+                <>
+                  {hol && <div style={{ fontSize: 9, color: "#8A6D00", marginTop: 4, fontWeight: 700 }}>⚠ {hol.name} ({holAM ? "AM" : "PM"})</div>}
+                  <div style={{ height: 4, background: G.grayBg, borderRadius: 2, marginTop: hol ? 4 : 8 }}>
+                    <div style={{ height: "100%", width: `${Math.max(pct * 100, 2)}%`, background: c, borderRadius: 2, transition: "width 0.3s" }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: c }}>{Math.round(pct * 100)}%</span>
+                    <span style={{ fontSize: 11, color: G.grayDk, alignSelf: "flex-end" }}>{occByDay[i]}/{totalSlotsPerDay}</span>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
@@ -272,20 +297,25 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
               <tr>
                 <th style={{ ...F.th, position: "sticky", left: 0, zIndex: 4, minWidth: 100, background: "#354A5F" }} rowSpan={2}>Oficina</th>
                 <th style={{ ...F.th, position: "sticky", left: 100, zIndex: 4, minWidth: 100, background: "#354A5F" }} rowSpan={2}>Escritorio</th>
-                {DAYS.map((d, i) => (
-                  <th key={i} colSpan={2} style={{ ...F.th, textAlign: "center", minWidth: 160, background: i === todayDayIdx ? G.red : "#354A5F", borderLeft: "1px solid rgba(255,255,255,0.15)" }}>
-                    <div>{d}</div><div style={{ fontWeight: 400, fontSize: 10, opacity: 0.7 }}>{fmtDate(weekDates[i])}</div>
-                  </th>
-                ))}
+                {DAYS.map((d, i) => {
+                  const hol = dayHolidays[i];
+                  const fullH = hol && hol.block_am && hol.block_pm;
+                  return (
+                    <th key={i} colSpan={2} style={{ ...F.th, textAlign: "center", minWidth: 160, background: fullH ? "#8A6D00" : i === todayDayIdx ? G.red : "#354A5F", borderLeft: "1px solid rgba(255,255,255,0.15)" }}>
+                      <div>{d} {fullH ? "🏖" : ""}</div>
+                      <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.7 }}>{fmtDate(weekDates[i])}{fullH ? ` · ${hol.name}` : ""}</div>
+                    </th>
+                  );
+                })}
               </tr>
               <tr>
                 {DAYS.map((_, i) =>
                   PERIODS.map(p => (
                     <th key={`${i}_${p}`} style={{
                       ...F.th, textAlign: "center", fontSize: 10, padding: "4px 6px",
-                      background: i === todayDayIdx ? (p === "AM" ? "#a00c0c" : "#8a0a0a") : (p === "AM" ? "#2C3E50" : "#243342"),
+                      background: (dayHolidays[i] && ((p === "AM" && dayHolidays[i].block_am) || (p === "PM" && dayHolidays[i].block_pm))) ? "#B8960A" : i === todayDayIdx ? (p === "AM" ? "#a00c0c" : "#8a0a0a") : (p === "AM" ? "#2C3E50" : "#243342"),
                       borderLeft: p === "AM" ? "1px solid rgba(255,255,255,0.15)" : "none", letterSpacing: 1.5,
-                    }}>{p}</th>
+                    }}>{(dayHolidays[i] && ((p === "AM" && dayHolidays[i].block_am) || (p === "PM" && dayHolidays[i].block_pm))) ? "🏖" : p}</th>
                   ))
                 )}
               </tr>
@@ -293,20 +323,23 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
             <tbody>
               {Object.entries(grouped).map(([office, offDesks]) =>
                 offDesks.map((desk, dIdx) => {
-                  const blocked = desk.status !== "available";
+                  const deskBlocked = desk.status !== "available";
                   return (
-                    <tr key={desk.id} style={{ background: blocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white }}>
+                    <tr key={desk.id} style={{ background: deskBlocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white }}>
                       {dIdx === 0 && (
-                        <td style={{ ...F.td, position: "sticky", left: 0, fontWeight: 700, background: blocked ? "#FFF3F0" : "#F5F6F7", borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 2 }}
+                        <td style={{ ...F.td, position: "sticky", left: 0, fontWeight: 700, background: deskBlocked ? "#FFF3F0" : "#F5F6F7", borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 2 }}
                           rowSpan={offDesks.length}>{office}</td>
                       )}
-                      <td style={{ ...F.td, position: "sticky", left: 100, background: blocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white, borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 1 }}>
+                      <td style={{ ...F.td, position: "sticky", left: 100, background: deskBlocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white, borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 1 }}>
                         {desk.desk}
                         {desk.status === "reserved" && <span style={{ ...F.statusBadge, background: "#FFF3F0", color: G.red }}>Reservado</span>}
                         {desk.status === "maintenance" && <span style={{ ...F.statusBadge, background: G.yellowBg, color: "#8A6D00" }}>Mantención</span>}
                       </td>
                       {DAYS.map((_, dayIdx) =>
                         PERIODS.map(period => {
+                          const hol = dayHolidays[dayIdx];
+                          const holBlocked = hol && ((period === "AM" && hol.block_am) || (period === "PM" && hol.block_pm));
+                          const cellBlocked = deskBlocked || holBlocked;
                           const key = `${desk.id}_${dayIdx}_${period}`;
                           const pid = weekRecords[key];
                           const person = people.find(p => p.id === pid);
@@ -316,11 +349,13 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                           return (
                             <td key={`${dayIdx}_${period}`} style={{
                               ...F.td, padding: 2,
-                              background: blocked ? "#FFF3F0" : isToday ? "#FFF8F6" : undefined,
+                              background: holBlocked ? G.yellowBg : deskBlocked ? "#FFF3F0" : isToday ? "#FFF8F6" : undefined,
                               borderLeft: isAM ? `1px solid ${G.grayBg}` : "none",
                             }}>
-                              {blocked ? (
-                                <div style={{ textAlign: "center", color: G.grayMid, fontSize: 12 }}>—</div>
+                              {cellBlocked ? (
+                                <div style={{ textAlign: "center", color: holBlocked ? "#8A6D00" : G.grayMid, fontSize: holBlocked ? 10 : 12, fontWeight: holBlocked ? 700 : 400 }}>
+                                  {holBlocked ? "Feriado" : "—"}
+                                </div>
                               ) : (
                                 <div onDoubleClick={() => person && editNote(desk.id, dayIdx, period)} title={note ? `Nota: ${note}` : ""}>
                                   <select value={pid || ""} onChange={e => setCell(desk.id, dayIdx, period, e.target.value)} style={{
