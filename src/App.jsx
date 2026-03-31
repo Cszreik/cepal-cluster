@@ -332,7 +332,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
             <tbody>
               {Object.entries(grouped).map(([office, offDesks]) =>
                 offDesks.map((desk, dIdx) => {
-                  const deskBlocked = desk.status !== "available";
+                  const deskBlocked = desk.status !== "maintenance";
                   return (
                     <tr key={desk.id} style={{ background: deskBlocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white }}>
                       {dIdx === 0 && (
