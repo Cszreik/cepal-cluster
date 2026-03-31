@@ -348,7 +348,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                         PERIODS.map(period => {
                           const hol = dayHolidays[dayIdx];
                           const holBlocked = hol && ((period === "AM" && hol.block_am) || (period === "PM" && hol.block_pm));
-                          const blocked = deskBlocked || holBlocked;
+                          const blocked = (desk.status === "maintenance") || holBlocked;
                           const key = `${desk.id}_${dayIdx}_${period}`;
                           const pid = weekRecords[key];
                           const person = people.find(p => p.id === pid);
