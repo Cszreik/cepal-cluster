@@ -31,7 +31,7 @@ function canGoForward(wk) {
   const now = new Date();
   const day = now.getDay();
   const hour = now.getHours();
-  const unlocked = day > 5 || day === 0 || (day === 5 && hour >= 14);
+  const unlocked = day > 5 || day === 0 || (day === 5 && hour >= 8) || (day === 4 && hour >= 8 && window.__fridayIsHoliday);
   const maxWeek = unlocked ? nextWeekKey() : todayWeekKey();
   return wk < maxWeek;
 }
@@ -168,6 +168,14 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
       return holidays.find(h => h.date === ds) || null;
     });
   }, [weekDates, holidays]);
+
+  useMemo(() => {
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    const fridayStr = toDateStr(friday);
+    const fridayHol = holidays.find(h => h.date === fridayStr && h.block_am && h.block_pm);
+    window.__fridayIsHoliday = !!fridayHol;
+  }, [monday, holidays]);
 
   const isCurrent = isCurrentWeek(currentWeek);
   const isNext = isNextWeek(currentWeek);
