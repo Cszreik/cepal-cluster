@@ -158,7 +158,7 @@ function OfficeHover({ name }) {
         <div style={{
           position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 999,
           background: G.white, border: "1px solid #DEE2E6", borderRadius: 10,
-          boxShadow: "0 12px 40px rgba(0,0,0,0.25)", padding: 10, width: 280,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.25)", padding: 10, width: 420,
           pointerEvents: "none",
         }}>
           <img src={officeImgPath(name)} alt={name}
