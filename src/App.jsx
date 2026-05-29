@@ -148,23 +148,31 @@ export default function App() {
 function OfficeHover({ name }) {
   const [show, setShow] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const handleEnter = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPos({ x: rect.right + 12, y: rect.top - 20 });
+    setShow(true);
+  };
   return (
-    <div style={{ position: "relative", display: "inline-block" }}
-      onMouseEnter={() => setShow(true)} onMouseLeave={() => { setShow(false); setImgError(false); }}>
-      <span style={{ cursor: "pointer", borderBottom: "1px dashed #999" }}>{name}</span>
+    <>
+      <span style={{ cursor: "pointer", borderBottom: "1px dashed #999" }}
+        onMouseEnter={handleEnter} onMouseLeave={() => { setShow(false); setImgError(false); }}>
+        {name}
+      </span>
       {show && !imgError && (
         <div style={{
-          position: "absolute", left: "100%", top: -10, marginLeft: 8, zIndex: 50,
-          background: G.white, border: "1px solid #DEE2E6", borderRadius: 6,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.15)", padding: 6, width: 220,
+          position: "fixed", left: pos.x, top: Math.max(pos.y, 60), zIndex: 999,
+          background: G.white, border: "1px solid #DEE2E6", borderRadius: 8,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 8, width: 240,
         }}>
           <img src={officeImgPath(name)} alt={name}
             onError={() => setImgError(true)}
-            style={{ width: "100%", borderRadius: 4, display: "block" }} />
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#32363A", textAlign: "center", marginTop: 4 }}>{name}</div>
+            style={{ width: "100%", borderRadius: 6, display: "block" }} />
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#32363A", textAlign: "center", marginTop: 6 }}>{name}</div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 /* ═══ REGISTRO ═══ */
