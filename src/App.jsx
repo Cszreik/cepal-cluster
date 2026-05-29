@@ -38,6 +38,9 @@ function canGoForward(wk) {
 function isCurrentWeek(wk) { return wk === todayWeekKey(); }
 function isNextWeek(wk) { return wk === nextWeekKey(); }
 function toDateStr(d) { return d.toISOString().split("T")[0]; }
+function officeImgPath(name) {
+  return `/cepal-cluster/offices/${name.toLowerCase().replace(/\s+/g, "-").replace(/\./g, "")}.png`;
+}
 
 function useDB() {
   const [people, setPeople] = useState([]);
@@ -142,7 +145,28 @@ export default function App() {
     </div>
   );
 }
-
+function OfficeHover({ name }) {
+  const [show, setShow] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => { setShow(false); setImgError(false); }}>
+      <span style={{ cursor: "pointer", borderBottom: "1px dashed #999" }}>{name}</span>
+      {show && !imgError && (
+        <div style={{
+          position: "absolute", left: "100%", top: -10, marginLeft: 8, zIndex: 50,
+          background: G.white, border: "1px solid #DEE2E6", borderRadius: 6,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.15)", padding: 6, width: 220,
+        }}>
+          <img src={officeImgPath(name)} alt={name}
+            onError={() => setImgError(true)}
+            style={{ width: "100%", borderRadius: 4, display: "block" }} />
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#32363A", textAlign: "center", marginTop: 4 }}>{name}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 /* ═══ REGISTRO ═══ */
 function RegistroTab({ db, currentWeek, setCurrentWeek }) {
   const { people, desks, attendance, holidays } = db;
@@ -345,7 +369,9 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                     <tr key={desk.id} style={{ background: deskBlocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white }}>
                       {dIdx === 0 && (
                         <td style={{ ...F.td, position: "sticky", left: 0, fontWeight: 700, background: deskBlocked ? "#FFF3F0" : "#F5F6F7", borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 2 }}
-                          rowSpan={offDesks.length}>{office}</td>
+                          rowSpan={offDesks.length}>
+                          <OfficeHover name={office} />
+                        </td>
                       )}
                       <td style={{ ...F.td, position: "sticky", left: 100, background: deskBlocked ? "#FFF3F0" : dIdx % 2 === 0 ? "#FAFBFC" : G.white, borderRight: `1px solid ${G.grayBg}`, fontSize: 11, zIndex: 1 }}>
                         {desk.desk}
