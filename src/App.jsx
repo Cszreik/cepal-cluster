@@ -148,28 +148,23 @@ export default function App() {
 function OfficeHover({ name }) {
   const [show, setShow] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const handleEnter = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setPos({ x: rect.right + 12, y: rect.top - 20 });
-    setShow(true);
-  };
   return (
     <>
       <span style={{ cursor: "pointer", borderBottom: "1px dashed #999" }}
-        onMouseEnter={handleEnter} onMouseLeave={() => { setShow(false); setImgError(false); }}>
+        onMouseEnter={() => setShow(true)} onMouseLeave={() => { setShow(false); setImgError(false); }}>
         {name}
       </span>
       {show && !imgError && (
         <div style={{
-          position: "fixed", left: pos.x, top: Math.max(pos.y, 60), zIndex: 999,
-          background: G.white, border: "1px solid #DEE2E6", borderRadius: 8,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.18)", padding: 8, width: 240,
+          position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 999,
+          background: G.white, border: "1px solid #DEE2E6", borderRadius: 10,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.25)", padding: 10, width: 280,
+          pointerEvents: "none",
         }}>
           <img src={officeImgPath(name)} alt={name}
             onError={() => setImgError(true)}
             style={{ width: "100%", borderRadius: 6, display: "block" }} />
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#32363A", textAlign: "center", marginTop: 6 }}>{name}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#32363A", textAlign: "center", marginTop: 8 }}>{name}</div>
         </div>
       )}
     </>
