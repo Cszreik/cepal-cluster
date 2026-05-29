@@ -152,7 +152,8 @@ function OfficeHover({ name }) {
     <>
       <span style={{ cursor: "pointer", borderBottom: "1px dashed #999" }}
         onMouseEnter={() => setShow(true)} onMouseLeave={() => { setShow(false); setImgError(false); }}>
-        {name} <span style={{ fontSize: 9, color: G.grayMid, marginLeft: 4 }}>🔍</span>
+        {name}
+        <span style={{ fontSize: 8, color: "#009bc2", marginLeft: 3 }}>[ver]</span>
       </span>
       {show && !imgError && (
         <div style={{
