@@ -37,6 +37,17 @@ CREATE INDEX idx_attendance_week ON attendance(week_key);
 CREATE INDEX idx_attendance_person ON attendance(person_id);
 CREATE INDEX idx_attendance_desk ON attendance(desk_id);
 
+CREATE TABLE holidays (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  date DATE NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  block_am BOOLEAN DEFAULT true,
+  block_pm BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_holidays_date ON holidays(date);
+
 -- Datos iniciales
 INSERT INTO people (initials, name, area) VALUES
   ('KA', 'Katherine A.', 'Área 1'),
@@ -60,10 +71,12 @@ INSERT INTO desks (office, desk, status, sort_order) VALUES
 ALTER TABLE people ENABLE ROW LEVEL SECURITY;
 ALTER TABLE desks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "allow_all_people" ON people FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all_desks" ON desks FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "allow_all_attendance" ON attendance FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all_holidays" ON holidays FOR ALL USING (true) WITH CHECK (true);
 
 -- Auto-update timestamp
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -75,7 +88,8 @@ CREATE TRIGGER attendance_updated_at
   BEFORE UPDATE ON attendance
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Activar Realtime en las 3 tablas
+-- Activar Realtime en las 4 tablas
 ALTER PUBLICATION supabase_realtime ADD TABLE people;
 ALTER PUBLICATION supabase_realtime ADD TABLE desks;
 ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
+ALTER PUBLICATION supabase_realtime ADD TABLE holidays;

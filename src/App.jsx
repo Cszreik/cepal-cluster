@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, createContext, useContext } from "react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from "recharts";
-import { supabase } from "./supabase";
+import { supabase, isSupabaseConfigured } from "./supabase";
 
 const PERIODS = ["AM", "PM"];
 const G = {
@@ -27,11 +27,18 @@ function fmtWeek(d) {
 function weekKey(d) { return getMonday(d).toISOString().split("T")[0]; }
 function todayWeekKey() { return weekKey(new Date()); }
 function nextWeekKey() { const d = getMonday(new Date()); d.setDate(d.getDate() + 7); return d.toISOString().split("T")[0]; }
-function canGoForward(wk) {
+function isUpcomingFridayHoliday(holidays) {
+  const monday = getMonday(new Date());
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  const fridayStr = toDateStr(friday);
+  return holidays.some(h => h.date === fridayStr && h.block_am && h.block_pm);
+}
+function canGoForward(wk, holidays) {
   const now = new Date();
   const day = now.getDay();
   const hour = now.getHours();
-  const unlocked = day > 5 || day === 0 || (day === 5 && hour >= 8) || (day === 4 && hour >= 8 && window.__fridayIsHoliday);
+  const unlocked = day > 5 || day === 0 || (day === 5 && hour >= 8) || (day === 4 && hour >= 8 && isUpcomingFridayHoliday(holidays));
   const maxWeek = unlocked ? nextWeekKey() : todayWeekKey();
   return wk < maxWeek;
 }
@@ -40,6 +47,99 @@ function isNextWeek(wk) { return wk === nextWeekKey(); }
 function toDateStr(d) { return d.toISOString().split("T")[0]; }
 function officeImgPath(name) {
   return `/cepal-cluster/offices/${name.toLowerCase().replace(/\s+/g, "-").replace(/\./g, "")}.png`;
+}
+
+/* ═══ TOAST SYSTEM ═══ */
+const ToastCtx = createContext(() => {});
+const useToast = () => useContext(ToastCtx);
+
+function ToastHost({ toasts }) {
+  const cfg = {
+    success: { bg: "#E8F5E9", border: "#89ae10", color: "#3d5200", icon: "✓" },
+    error: { bg: "#FDECEA", border: G.red, color: "#8a0a0a", icon: "!" },
+    info: { bg: "#E5F0FF", border: G.blue, color: "#00446b", icon: "i" },
+  };
+  return (
+    <div style={{ position: "fixed", bottom: 20, right: 20, zIndex: 3000, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+      {toasts.map(t => {
+        const c = cfg[t.type] || cfg.info;
+        return (
+          <div key={t.id} style={{
+            display: "flex", alignItems: "center", gap: 10, minWidth: 220, maxWidth: 340,
+            background: c.bg, border: `1px solid ${c.border}`, borderLeft: `4px solid ${c.border}`,
+            borderRadius: 8, padding: "10px 14px", boxShadow: "0 6px 20px rgba(0,0,0,0.16)",
+            animation: "toastIn 0.22s cubic-bezier(0.2,0.8,0.2,1)",
+          }}>
+            <span style={{ width: 20, height: 20, borderRadius: "50%", background: c.border, color: G.white, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{c.icon}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: c.color }}>{t.msg}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══ DIALOG (modal confirm / prompt) ═══ */
+const DialogCtx = createContext({ confirm: () => Promise.resolve(false), prompt: () => Promise.resolve(null) });
+const useDialog = () => useContext(DialogCtx);
+
+function DialogHost({ dialog, onClose }) {
+  const [value, setValue] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (dialog) {
+      setValue(dialog.defaultValue || "");
+      const t = setTimeout(() => { if (inputRef.current) { inputRef.current.focus(); inputRef.current.select(); } }, 40);
+      return () => clearTimeout(t);
+    }
+  }, [dialog]);
+
+  useEffect(() => {
+    if (!dialog) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose(dialog.type === "confirm" ? false : null);
+      if (e.key === "Enter" && dialog.type === "confirm") onClose(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [dialog, onClose]);
+
+  if (!dialog) return null;
+  const isPrompt = dialog.type === "prompt";
+  const danger = dialog.danger;
+  const confirmColor = danger ? G.red : G.blue;
+
+  const submit = () => onClose(isPrompt ? value : true);
+  const cancel = () => onClose(isPrompt ? null : false);
+
+  return (
+    <div onMouseDown={cancel} style={{
+      position: "fixed", inset: 0, zIndex: 2500, background: "rgba(50,54,58,0.45)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      animation: "fadeIn 0.15s ease",
+    }}>
+      <div onMouseDown={e => e.stopPropagation()} style={{
+        background: G.white, borderRadius: 10, boxShadow: "0 16px 48px rgba(0,0,0,0.28)",
+        width: "100%", maxWidth: 400, overflow: "hidden", animation: "toastIn 0.2s cubic-bezier(0.2,0.8,0.2,1)",
+      }}>
+        <div style={{ height: 4, background: confirmColor }} />
+        <div style={{ padding: "22px 24px" }}>
+          {dialog.title && <div style={{ fontSize: 16, fontWeight: 700, color: "#32363A", marginBottom: 6 }}>{dialog.title}</div>}
+          <div style={{ fontSize: 13.5, color: G.grayDk, lineHeight: 1.5 }}>{dialog.message}</div>
+          {isPrompt && (
+            <input ref={inputRef} value={value} onChange={e => setValue(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") submit(); }}
+              style={{ ...F.input, width: "100%", marginTop: 14, flex: "none" }} />
+          )}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "0 24px 20px" }}>
+          <button onClick={cancel} style={{ ...F.navBtn, padding: "9px 18px" }}>{dialog.cancelLabel || "Cancelar"}</button>
+          <button onClick={submit} style={{ ...F.primaryBtn, background: confirmColor, padding: "9px 18px" }}>{dialog.confirmLabel || (danger ? "Eliminar" : "Aceptar")}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function useDB() {
@@ -51,6 +151,11 @@ function useDB() {
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
+    if (!isSupabaseConfigured) {
+      setError("Faltan las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY. Crea un archivo .env en base a .env.example.");
+      setLoading(false);
+      return;
+    }
     try {
       const [p, d, a, h] = await Promise.all([
         supabase.from("people").select("*").order("created_at"),
@@ -58,7 +163,8 @@ function useDB() {
         supabase.from("attendance").select("*"),
         supabase.from("holidays").select("*").order("date"),
       ]);
-      if (p.error) throw p.error;
+      const firstError = p.error || d.error || a.error || h.error;
+      if (firstError) throw firstError;
       setPeople(p.data); setDesks(d.data); setAttendance(a.data); setHolidays(h.data || []);
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, []);
@@ -66,6 +172,7 @@ function useDB() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
     const ch = supabase.channel("rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "people" }, () =>
         supabase.from("people").select("*").order("created_at").then(r => r.data && setPeople(r.data)))
@@ -88,24 +195,91 @@ export default function App() {
     return ["registro", "historial", "dashboard", "config"].includes(h) ? h : "registro";
   };
   const [tab, setTabState] = useState(getTab);
-  const setTab = (t) => { window.location.hash = t; setTabState(t); };
+  const [navStack, setNavStack] = useState(() => [getTab()]);
+  const navigateTo = (t) => {
+    window.location.hash = t;
+    setTabState(t);
+    setNavStack(s => [...s.filter(x => x !== t), t]);
+  };
+  const setTab = navigateTo;
+  const goBack = () => {
+    setNavStack(s => {
+      if (s.length <= 1) {
+        if (s[0] === "registro") return s;
+        window.location.hash = "registro";
+        setTabState("registro");
+        return ["registro"];
+      }
+      const newStack = s.slice(0, -1);
+      const target = newStack[newStack.length - 1];
+      window.location.hash = target;
+      setTabState(target);
+      return newStack;
+    });
+  };
+  const goHome = () => navigateTo("registro");
   useEffect(() => {
     const handler = () => setTabState(getTab());
     window.addEventListener("hashchange", handler);
     return () => window.removeEventListener("hashchange", handler);
   }, []);
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDocClick); document.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
+
   const [currentWeek, setCurrentWeek] = useState(todayWeekKey());
   const db = useDB();
 
+  const [toasts, setToasts] = useState([]);
+  const notify = useCallback((msg, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts(ts => [...ts, { id, msg, type }]);
+    setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 2600);
+  }, []);
+
+  const [dialog, setDialog] = useState(null);
+  const dialogResolveRef = useRef(null);
+  const closeDialog = useCallback((result) => {
+    setDialog(null);
+    if (dialogResolveRef.current) { dialogResolveRef.current(result); dialogResolveRef.current = null; }
+  }, []);
+  const dialogApi = useMemo(() => ({
+    confirm: (message, opts = {}) => new Promise(resolve => {
+      dialogResolveRef.current = resolve;
+      setDialog({ type: "confirm", message, danger: opts.danger, title: opts.title, confirmLabel: opts.confirmLabel, cancelLabel: opts.cancelLabel });
+    }),
+    prompt: (message, defaultValue = "", opts = {}) => new Promise(resolve => {
+      dialogResolveRef.current = resolve;
+      setDialog({ type: "prompt", message, defaultValue, title: opts.title, confirmLabel: opts.confirmLabel || "Guardar" });
+    }),
+  }), []);
+
   if (db.loading) return (
-    <div style={F.loadWrap}><div style={F.spinner} /><p style={{ color: G.grayDk, marginTop: 16, fontSize: 13 }}>Cargando...</p></div>
+    <div style={F.loadWrap}>
+      <img src="/cepal-cluster/branding/giz-workzone-logo.png" alt="GIZ WorkZone" style={{ height: 30, marginBottom: 28, opacity: 0.95 }} />
+      <div style={F.spinner} />
+      <p style={{ color: G.grayDk, marginTop: 16, fontSize: 13, letterSpacing: 0.3 }}>Cargando registro de asistencia…</p>
+    </div>
   );
   if (db.error) return (
-    <div style={{ padding: 40, textAlign: "center" }}>
-      <h2 style={{ color: G.red }}>Error de conexión</h2>
-      <p style={{ color: G.grayDk, marginTop: 8 }}>Verifica las variables de entorno.</p>
-      <pre style={{ background: G.grayBg, padding: 12, marginTop: 12, fontSize: 12 }}>{db.error}</pre>
+    <div style={F.loadWrap}>
+      <div style={{ ...F.card, maxWidth: 440, width: "90%", padding: 0, overflow: "hidden", marginBottom: 0 }}>
+        <div style={{ background: G.red, height: 4 }} />
+        <div style={{ padding: 32, textAlign: "center" }}>
+          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#FDECEA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 26, color: G.red, fontWeight: 800 }}>!</div>
+          <h2 style={{ color: "#32363A", fontSize: 18, fontWeight: 700 }}>Error de conexión</h2>
+          <p style={{ color: G.grayDk, marginTop: 8, fontSize: 13 }}>Verifica las variables de entorno.</p>
+          <pre style={{ background: "#F5F6F7", border: "1px solid #DEE2E6", borderRadius: 6, padding: 12, marginTop: 16, fontSize: 12, color: G.grayDk, textAlign: "left", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{db.error}</pre>
+        </div>
+      </div>
     </div>
   );
 
@@ -115,26 +289,55 @@ export default function App() {
     { id: "dashboard", label: "Dashboard" },
     { id: "config", label: "Configuración" },
   ];
+  const sectionLabel = tabs.find(t => t.id === tab)?.label || "";
+  const atHome = tab === "registro";
 
   return (
+    <ToastCtx.Provider value={notify}>
+    <DialogCtx.Provider value={dialogApi}>
     <div style={F.root}>
       <header style={F.shell}>
         <div style={F.shellInner}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <svg width={44} height={26} viewBox="0 0 100 60"><text x="0" y="48" fontFamily="Arial" fontWeight="900" fontSize="52" fill={G.white}>giz</text></svg>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/cepal-cluster/branding/giz-workzone-logo.png" alt="GIZ WorkZone" style={F.shellLogo} />
             <div style={F.shellDivider} />
-            <span style={F.shellTitle}>Registro de Asistencia</span>
+            {!atHome && (
+              <>
+                <button onClick={goBack} style={F.iconBtn} title="Atrás" aria-label="Atrás">
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={G.grayDk} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <button onClick={goHome} style={F.iconBtn} title="Inicio" aria-label="Inicio">
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke={G.grayDk} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /></svg>
+                </button>
+              </>
+            )}
+            <div>
+              <div style={F.shellTitle}>{sectionLabel}</div>
+              <div style={F.shellSub}>Clúster CEPAL · Av. Dag Hammarskjöld 3477</div>
+            </div>
           </div>
-          <span style={F.shellSub}>Clúster CEPAL · Av. Dag Hammarskjöld 3477</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div ref={menuRef} style={{ position: "relative" }}>
+              <button onClick={() => setMenuOpen(o => !o)} style={F.menuButton} aria-haspopup="true" aria-expanded={menuOpen} title="Menú">
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={G.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15 1.65 1.65 0 0 0 3.17 14H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 4.29l.06.06A1.65 1.65 0 0 0 8.92 4.6 1.65 1.65 0 0 0 9.92 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              {menuOpen && (
+                <div style={F.menuDropdown}>
+                  {tabs.map(t => (
+                    <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{ ...F.menuItem, ...(tab === t.id ? F.menuItemActive : {}) }}>
+                      {t.label}
+                      {tab === t.id && <span>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </header>
-      <div style={F.tabBar}>
-        <div style={F.tabBarInner}>
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ ...F.tabBtn, ...(tab === t.id ? F.tabBtnActive : {}) }}>{t.label}</button>
-          ))}
-        </div>
-      </div>
       <main style={F.main}>
         {tab === "registro" && <RegistroTab db={db} currentWeek={currentWeek} setCurrentWeek={setCurrentWeek} />}
         {tab === "historial" && <HistorialTab db={db} />}
@@ -143,6 +346,10 @@ export default function App() {
       </main>
       <footer style={F.footer}>© 2026 GIZ — Deutsche Gesellschaft für Internationale Zusammenarbeit</footer>
     </div>
+    <ToastHost toasts={toasts} />
+    <DialogHost dialog={dialog} onClose={closeDialog} />
+    </DialogCtx.Provider>
+    </ToastCtx.Provider>
   );
 }
 function OfficeHover({ name }) {
@@ -174,6 +381,8 @@ function OfficeHover({ name }) {
 /* ═══ REGISTRO ═══ */
 function RegistroTab({ db, currentWeek, setCurrentWeek }) {
   const { people, desks, attendance, holidays } = db;
+  const notify = useToast();
+  const { prompt: promptDialog } = useDialog();
   const [saving, setSaving] = useState(false);
   const activePeople = people.filter(p => p.active);
   const monday = new Date(currentWeek + "T00:00:00");
@@ -197,13 +406,18 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     });
   }, [weekDates, holidays]);
 
-  useMemo(() => {
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-    const fridayStr = toDateStr(friday);
-    const fridayHol = holidays.find(h => h.date === fridayStr && h.block_am && h.block_pm);
-    window.__fridayIsHoliday = !!fridayHol;
-  }, [monday, holidays]);
+  // Person ids already assigned to some desk for a given day+period, so they
+  // don't appear as selectable in other desks for that same slot.
+  const usedByDayPeriod = useMemo(() => {
+    const m = {};
+    Object.entries(weekRecords).forEach(([key, pid]) => {
+      const [, dayIdx, period] = key.split("_");
+      const k = `${dayIdx}_${period}`;
+      if (!m[k]) m[k] = new Set();
+      m[k].add(pid);
+    });
+    return m;
+  }, [weekRecords]);
 
   const isCurrent = isCurrentWeek(currentWeek);
   const isNext = isNextWeek(currentWeek);
@@ -213,16 +427,21 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     setSaving(true);
     try {
       if (personId === "") {
-        await supabase.from("attendance").delete()
+        const { error } = await supabase.from("attendance").delete()
           .eq("week_key", currentWeek).eq("day_index", dayIdx)
           .eq("desk_id", deskId).eq("period", period);
+        if (error) throw error;
+        notify("Asignación eliminada", "info");
       } else {
-        await supabase.from("attendance").upsert({
+        const { error } = await supabase.from("attendance").upsert({
           week_key: currentWeek, day_index: dayIdx,
           desk_id: deskId, person_id: personId, period: period,
         }, { onConflict: "week_key,day_index,desk_id,period" });
+        if (error) throw error;
+        const who = people.find(p => p.id === personId);
+        notify(`${who ? who.initials : "Persona"} · ${DAYS[dayIdx]} ${period} guardado`);
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error(e); notify("No se pudo guardar", "error"); }
     setSaving(false);
   };
 
@@ -230,11 +449,13 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     const key = `${deskId}_${dayIdx}_${period}`;
     if (!weekRecords[key]) return;
     const current = weekNotes[key] || "";
-    const note = prompt("Nota para este turno:", current);
+    const note = await promptDialog("Nota para este turno:", current, { title: "Nota" });
     if (note === null) return;
-    await supabase.from("attendance").update({ notes: note })
+    const { error } = await supabase.from("attendance").update({ notes: note })
       .eq("week_key", currentWeek).eq("day_index", dayIdx)
       .eq("desk_id", deskId).eq("period", period);
+    if (error) notify("No se pudo guardar la nota", "error");
+    else notify(note.trim() ? "Nota guardada" : "Nota eliminada", "info");
   };
 
   const changeWeek = (offset) => {
@@ -268,12 +489,6 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
           <div>
             <div style={F.objectHeaderLabel}>Semana</div>
             <div style={F.objectHeaderTitle}>{fmtWeek(monday)}</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              {isCurrent && <span style={{ ...F.badge, background: G.cyan, color: G.white }}>Semana Actual</span>}
-              {isNext && <span style={{ ...F.badge, background: G.gold, color: G.black }}>Próxima Semana</span>}
-              {isPast && <span style={{ ...F.badge, background: G.grayBg, color: G.grayDk }}>Semana Pasada</span>}
-              {saving && <span style={{ ...F.badge, background: "#E5F0FF", color: G.blue }}>Guardando...</span>}
-            </div>
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <div style={F.kpiMini}><div style={F.kpiMiniVal}>{totalOcc}</div><div style={F.kpiMiniLabel}>Asignaciones</div></div>
@@ -283,8 +498,11 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
         </div>
         <div style={F.weekNav}>
           <button onClick={() => changeWeek(-1)} style={F.navBtn}>‹ Anterior</button>
-          {!isCurrent && <button onClick={goToday} style={{ ...F.navBtn, background: G.red, color: G.white, fontWeight: 700, border: "none" }}>● Hoy</button>}
-          <button onClick={() => changeWeek(1)} disabled={!canGoForward(currentWeek)} style={{ ...F.navBtn, ...(!canGoForward(currentWeek) ? F.navBtnDisabled : {}) }}>Siguiente ›</button>
+          {isCurrent
+            ? <span style={{ ...F.badge, background: G.cyan, color: G.white, padding: "7px 14px" }}>Semana Actual</span>
+            : <button onClick={goToday} style={{ ...F.navBtn, background: G.red, color: G.white, fontWeight: 700, border: "none" }}>● Semana Actual</button>}
+          <button onClick={() => changeWeek(1)} disabled={!canGoForward(currentWeek, holidays)} style={{ ...F.navBtn, ...(!canGoForward(currentWeek, holidays) ? F.navBtnDisabled : {}) }}>Siguiente ›</button>
+          {saving && <span style={{ ...F.badge, background: "#E5F0FF", color: G.blue, marginLeft: 4 }}>Guardando…</span>}
         </div>
       </div>
 
@@ -311,7 +529,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                 </div>
               ) : (
                 <>
-                  {hol && <div style={{ fontSize: 9, color: "#8A6D00", marginTop: 4, fontWeight: 700 }}>⚠ {hol.name} ({holAM ? "AM" : "PM"})</div>}
+                  {hol && <div style={{ fontSize: 9, color: "#8A6D00", marginTop: 4, fontWeight: 700 }}>{hol.name} ({holAM ? "AM" : "PM"})</div>}
                   <div style={{ height: 4, background: G.grayBg, borderRadius: 2, marginTop: hol ? 4 : 8 }}>
                     <div style={{ height: "100%", width: `${Math.max(pct * 100, 2)}%`, background: c, borderRadius: 2, transition: "width 0.3s" }} />
                   </div>
@@ -342,9 +560,19 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                   const hol = dayHolidays[i];
                   const fullH = hol && hol.block_am && hol.block_pm;
                   return (
-                    <th key={i} colSpan={2} style={{ ...F.th, textAlign: "center", minWidth: 160, background: fullH ? "#8A6D00" : i === todayDayIdx ? G.red : "#354A5F", borderLeft: "1px solid rgba(255,255,255,0.15)" }}>
-                      <div>{d} {fullH ? "🏖" : ""}</div>
-                      <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.7 }}>{fmtDate(weekDates[i])}{fullH ? ` · ${hol.name}` : ""}</div>
+                    <th key={i} colSpan={2} style={{ ...F.th, textAlign: "center", minWidth: fullH ? 190 : 160, background: fullH ? "#8A6D00" : i === todayDayIdx ? G.red : "#354A5F", borderLeft: "1px solid rgba(255,255,255,0.15)" }}>
+                      <div>{d}</div>
+                      <div
+                        title={fullH ? hol.name : undefined}
+                        style={{
+                          fontWeight: 400, fontSize: 10, opacity: 0.85, marginTop: 5,
+                          textTransform: "none", letterSpacing: "normal",
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          maxWidth: fullH ? 180 : "none", marginLeft: "auto", marginRight: "auto",
+                        }}
+                      >
+                        {fmtDate(weekDates[i])}{fullH ? ` · ${hol.name}` : ""}
+                      </div>
                     </th>
                   );
                 })}
@@ -356,10 +584,10 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                     const isBlocked = hol && ((p === "AM" && hol.block_am) || (p === "PM" && hol.block_pm));
                     return (
                       <th key={`${i}_${p}`} style={{
-                        ...F.th, textAlign: "center", fontSize: 10, padding: "4px 6px",
+                        ...F.th, textAlign: "center", fontSize: isBlocked ? 8.5 : 10, padding: "4px 6px",
                         background: isBlocked ? "#B8960A" : i === todayDayIdx ? (p === "AM" ? "#a00c0c" : "#8a0a0a") : (p === "AM" ? "#2C3E50" : "#243342"),
-                        borderLeft: p === "AM" ? "1px solid rgba(255,255,255,0.15)" : "none", letterSpacing: 1.5,
-                      }}>{isBlocked ? "🏖" : p}</th>
+                        borderLeft: p === "AM" ? "1px solid rgba(255,255,255,0.15)" : "none", letterSpacing: isBlocked ? 0.4 : 1.5,
+                      }}>{isBlocked ? "Feriado" : p}</th>
                     );
                   })
                 )}
@@ -393,6 +621,8 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                           const note = weekNotes[key];
                           const isToday = dayIdx === todayDayIdx;
                           const isAM = period === "AM";
+                          const usedSet = usedByDayPeriod[`${dayIdx}_${period}`];
+                          const selectablePeople = usedSet ? activePeople.filter(p => p.id === pid || !usedSet.has(p.id)) : activePeople;
                           return (
                             <td key={`${dayIdx}_${period}`} style={{
                               ...F.td, padding: 2,
@@ -413,7 +643,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
                                     fontWeight: person ? 700 : 400,
                                   }}>
                                     <option value="">—</option>
-                                    {activePeople.map(p => <option key={p.id} value={p.id}>{p.initials}</option>)}
+                                    {selectablePeople.map(p => <option key={p.id} value={p.id} title={p.name}>{p.initials}</option>)}
                                   </select>
                                   {person && note && (
                                     <div title={note} style={{
@@ -477,7 +707,7 @@ function HistorialTab({ db }) {
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={F.cardHeader}><span style={F.cardHeaderText}>Registros</span></div>
         <div style={{ overflowX: "auto" }}>
-          <table style={F.table}>
+          <table style={F.table} className="hoverable">
             <thead><tr>{["Semana", "Día", "Fecha", "Turno", "Oficina", "Escritorio", "Persona", "Nota"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
             <tbody>
               {filtered.length === 0 ? <tr><td colSpan={8} style={{ ...F.td, textAlign: "center", padding: 48, color: G.grayDk }}>Sin registros.</td></tr> :
@@ -544,7 +774,7 @@ function DashboardTab({ db }) {
           <ResponsiveContainer width="100%" height={240}><PieChart><Pie data={stats.od} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} label={({name,percent}) => `${name} (${(percent*100).toFixed(0)}%)`}>{stats.od.map((_,i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer>
         </div></div>
         <div style={{ ...F.card, overflow: "hidden" }}><div style={F.cardHeader}><span style={F.cardHeaderText}>Detalle</span></div>
-          <table style={F.table}><thead><tr>{["Persona","Turnos","Sem.","Prom."].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+          <table style={F.table} className="hoverable"><thead><tr>{["Persona","Turnos","Sem.","Prom."].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
             <tbody>{stats.pd.map((p,i) => (<tr key={i} style={{ background: i%2===0 ? "#FAFBFC" : G.white }}><td style={F.td}><span style={F.pill}>{p.name}</span> {p.fullName}</td><td style={{ ...F.td, textAlign: "center", fontWeight: 700 }}>{p.days}</td><td style={{ ...F.td, textAlign: "center" }}>{p.weeks}</td><td style={{ ...F.td, textAlign: "center", fontWeight: 700, color: G.blue }}>{p.avg}</td></tr>))}</tbody>
           </table></div>
       </div>
@@ -555,6 +785,8 @@ function DashboardTab({ db }) {
 /* ═══ CONFIG ═══ */
 function ConfigTab({ db }) {
   const { people, desks, holidays } = db;
+  const notify = useToast();
+  const { confirm: confirmDialog, prompt: promptDialog } = useDialog();
 
   const [nP, setNP] = useState({ initials: "", name: "", area: "" });
   const [showAddPerson, setShowAddPerson] = useState(false);
@@ -572,34 +804,50 @@ function ConfigTab({ db }) {
   const addPerson = async () => {
     if (!nP.initials || !nP.name) return;
     setBusyP(true);
-    await supabase.from("people").insert({ initials: nP.initials, name: nP.name, area: nP.area, active: true });
+    const { error } = await supabase.from("people").insert({ initials: nP.initials, name: nP.name, area: nP.area, active: true });
+    if (error) notify("No se pudo agregar la persona", "error");
+    else notify(`${nP.name} agregado`);
     setNP({ initials: "", name: "", area: "" }); setShowAddPerson(false); setBusyP(false);
   };
-  const togglePerson = async (id, a) => { await supabase.from("people").update({ active: !a }).eq("id", id); };
-  const removePerson = async (id) => { if (confirm("¿Eliminar esta persona?")) await supabase.from("people").delete().eq("id", id); };
+  const togglePerson = async (id, a) => {
+    await supabase.from("people").update({ active: !a }).eq("id", id);
+    notify(a ? "Persona desactivada" : "Persona activada", "info");
+  };
+  const removePerson = async (id) => {
+    const p = people.find(x => x.id === id);
+    if (!(await confirmDialog(`Se eliminará ${p ? p.name : "esta persona"} de forma permanente.`, { danger: true, title: "¿Eliminar persona?" }))) return;
+    const { error } = await supabase.from("people").delete().eq("id", id);
+    notify(error ? "No se pudo eliminar" : "Persona eliminada", error ? "error" : "info");
+  };
 
   // Desk CRUD
   const addDesk = async () => {
     if (!nD.office || !nD.desk) return;
     setBusyD(true);
     const maxSort = desks.length > 0 ? Math.max(...desks.map(d => d.sort_order || 0)) + 1 : 1;
-    await supabase.from("desks").insert({ office: nD.office, desk: nD.desk, status: "available", sort_order: maxSort });
+    const { error } = await supabase.from("desks").insert({ office: nD.office, desk: nD.desk, status: "available", sort_order: maxSort });
+    if (error) notify("No se pudo agregar el escritorio", "error");
+    else notify(`${nD.office} · ${nD.desk} agregado`);
     setND({ office: "", desk: "" }); setShowAddDesk(false); setBusyD(false);
   };
   const cycleDesk = async (id, s) => {
     await supabase.from("desks").update({ status: s === "available" ? "reserved" : s === "reserved" ? "maintenance" : "available" }).eq("id", id);
   };
   const removeDesk = async (id) => {
-    if (confirm("¿Eliminar este escritorio?")) await supabase.from("desks").delete().eq("id", id);
+    const d = desks.find(x => x.id === id);
+    if (!(await confirmDialog(`Se eliminará ${d ? `${d.office} · ${d.desk}` : "este escritorio"} de forma permanente.`, { danger: true, title: "¿Eliminar escritorio?" }))) return;
+    const { error } = await supabase.from("desks").delete().eq("id", id);
+    notify(error ? "No se pudo eliminar" : "Escritorio eliminado", error ? "error" : "info");
   };
   const renameDesk = async (id, field) => {
     const desk = desks.find(d => d.id === id);
     if (!desk) return;
     const current = field === "office" ? desk.office : desk.desk;
     const label = field === "office" ? "Nombre de oficina" : "Nombre de escritorio";
-    const val = prompt(`${label}:`, current);
+    const val = await promptDialog(`${label}:`, current, { title: "Editar" });
     if (val === null || val === current || !val.trim()) return;
-    await supabase.from("desks").update({ [field]: val.trim() }).eq("id", id);
+    const { error } = await supabase.from("desks").update({ [field]: val.trim() }).eq("id", id);
+    notify(error ? "No se pudo guardar" : "Cambio guardado", error ? "error" : "info");
   };
   const moveDesk = async (id, direction) => {
     const idx = desks.findIndex(d => d.id === id);
@@ -616,11 +864,16 @@ function ConfigTab({ db }) {
   const addHoliday = async () => {
     if (!nH.date || !nH.name) return;
     setBusyH(true);
-    await supabase.from("holidays").insert({ date: nH.date, name: nH.name, block_am: nH.block_am, block_pm: nH.block_pm });
+    const { error } = await supabase.from("holidays").insert({ date: nH.date, name: nH.name, block_am: nH.block_am, block_pm: nH.block_pm });
+    if (error) notify("No se pudo agregar el feriado", "error");
+    else notify(`Feriado "${nH.name}" agregado`);
     setNH({ date: "", name: "", block_am: true, block_pm: true }); setShowAddHoliday(false); setBusyH(false);
   };
   const removeHoliday = async (id) => {
-    if (confirm("¿Eliminar este feriado?")) await supabase.from("holidays").delete().eq("id", id);
+    const h = holidays.find(x => x.id === id);
+    if (!(await confirmDialog(`Se eliminará el feriado ${h ? `"${h.name}"` : ""} de forma permanente.`, { danger: true, title: "¿Eliminar feriado?" }))) return;
+    const { error } = await supabase.from("holidays").delete().eq("id", id);
+    notify(error ? "No se pudo eliminar" : "Feriado eliminado", error ? "error" : "info");
   };
   const toggleHolidayPeriod = async (id, field) => {
     const h = holidays.find(x => x.id === id);
@@ -654,7 +907,7 @@ function ConfigTab({ db }) {
           <input placeholder="Área" value={nP.area} onChange={e => setNP({ ...nP, area: e.target.value })} style={F.input} />
           <button onClick={addPerson} disabled={busyP} style={{ ...F.primaryBtn, background: G.green, opacity: busyP ? 0.6 : 1 }}>{busyP ? "..." : "Guardar"}</button>
         </div>}
-        <table style={F.table}><thead><tr>{["Inic.", "Nombre", "Área", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+        <table style={F.table} className="hoverable"><thead><tr>{["Inic.", "Nombre", "Área", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
           <tbody>{people.map((p, i) => (
             <tr key={p.id} style={{ background: i % 2 === 0 ? "#FAFBFC" : G.white }}>
               <td style={F.td}><span style={F.pill}>{p.initials}</span></td>
@@ -693,7 +946,7 @@ function ConfigTab({ db }) {
           </div>
           <button onClick={addDesk} disabled={busyD} style={{ ...F.primaryBtn, background: G.green, opacity: busyD ? 0.6 : 1 }}>{busyD ? "..." : "Guardar"}</button>
         </div>}
-        <table style={F.table}><thead><tr>{["Orden", "Oficina", "Escritorio", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+        <table style={F.table} className="hoverable"><thead><tr>{["Orden", "Oficina", "Escritorio", "Estado", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
           <tbody>{desks.map((d, i) => {
             const st = stM[d.status];
             return (
@@ -724,7 +977,7 @@ function ConfigTab({ db }) {
       <div style={{ ...F.card, overflow: "hidden" }}>
         <div style={{ ...F.cardHeader, display: "flex", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={F.cardHeaderText}>🏖 Feriados</span>
+            <span style={F.cardHeaderText}>Feriados</span>
             <span style={{ fontSize: 11, color: G.grayDk }}>Los días feriados se bloquean automáticamente en el registro</span>
           </div>
           <button onClick={() => setShowAddHoliday(!showAddHoliday)} style={{ ...F.primaryBtn, padding: "6px 14px", fontSize: 12, background: showAddHoliday ? G.grayDk : G.blue }}>
@@ -752,7 +1005,7 @@ function ConfigTab({ db }) {
         </div>}
 
         {/* Upcoming holidays */}
-        <table style={F.table}><thead><tr>{["Fecha", "Nombre", "Bloquea", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
+        <table style={F.table} className="hoverable"><thead><tr>{["Fecha", "Nombre", "Bloquea", "Acciones"].map(h => <th key={h} style={F.th}>{h}</th>)}</tr></thead>
           <tbody>
             {holidays.length === 0 ? (
               <tr><td colSpan={4} style={{ ...F.td, textAlign: "center", padding: 32, color: G.grayDk }}>No hay feriados configurados.</td></tr>
@@ -803,17 +1056,19 @@ const F = {
   root: { fontFamily: "'72','Arial Narrow',Arial,sans-serif", background: "#F5F6F7", minHeight: "100vh", color: "#32363A", fontSize: 14 },
   loadWrap: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#F5F6F7" },
   spinner: { width: 36, height: 36, border: "3px solid #DEE2E6", borderTopColor: G.red, borderRadius: "50%", animation: "spin 0.8s linear infinite" },
-  shell: { background: "#354A5F", color: G.white, position: "sticky", top: 0, zIndex: 100 },
-  shellInner: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", height: 48, maxWidth: 1200, margin: "0 auto" },
-  shellDivider: { width: 1, height: 24, background: "rgba(255,255,255,0.3)" },
-  shellTitle: { fontSize: 15, fontWeight: 600, letterSpacing: 0.3 },
-  shellSub: { fontSize: 11, opacity: 0.7 },
-  tabBar: { background: G.white, borderBottom: "1px solid #DEE2E6", position: "sticky", top: 48, zIndex: 90 },
-  tabBarInner: { display: "flex", maxWidth: 1200, margin: "0 auto", padding: "0 20px", overflowX: "auto" },
-  tabBtn: { padding: "12px 20px", border: "none", background: "transparent", color: G.grayDk, fontSize: 13, fontWeight: 600, cursor: "pointer", borderBottom: "3px solid transparent", fontFamily: "inherit", whiteSpace: "nowrap" },
-  tabBtnActive: { color: G.red, borderBottomColor: G.red },
+  shell: { background: G.white, color: "#32363A", position: "sticky", top: 0, zIndex: 100, borderBottom: "1px solid #DEE2E6" },
+  shellInner: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", height: 56, maxWidth: 1200, margin: "0 auto" },
+  shellLogo: { height: 26, display: "block" },
+  shellDivider: { width: 1, height: 28, background: "#DEE2E6" },
+  shellTitle: { fontSize: 15, fontWeight: 700, letterSpacing: 0.2, color: "#32363A", lineHeight: 1.3 },
+  shellSub: { fontSize: 10.5, color: G.grayDk, lineHeight: 1.3 },
+  iconBtn: { width: 28, height: 28, borderRadius: 6, border: "1px solid #DEE2E6", background: G.white, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 },
+  menuButton: { width: 30, height: 30, borderRadius: "50%", background: "#E5F0FF", border: "none", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" },
+  menuDropdown: { position: "absolute", top: 38, right: 0, background: G.white, border: "1px solid #DEE2E6", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.14)", padding: 6, minWidth: 180, zIndex: 200 },
+  menuItem: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "9px 12px", border: "none", background: "transparent", color: "#32363A", fontSize: 13, fontWeight: 600, cursor: "pointer", borderRadius: 6, fontFamily: "inherit", textAlign: "left" },
+  menuItemActive: { color: G.red, background: "#FFF3F0" },
   main: { maxWidth: 1200, margin: "0 auto", padding: "16px 20px" },
-  objectHeader: { background: G.white, border: "1px solid #DEE2E6", borderRadius: 4, padding: "20px 24px", marginBottom: 16 },
+  objectHeader: { background: G.white, border: "1px solid #DEE2E6", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", padding: "20px 24px", marginBottom: 16 },
   objectHeaderTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 },
   objectHeaderLabel: { fontSize: 11, color: G.grayDk, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 },
   objectHeaderTitle: { fontSize: 24, fontWeight: 700, color: "#32363A", marginTop: 2 },
@@ -821,10 +1076,10 @@ const F = {
   kpiMini: { textAlign: "center", minWidth: 70 },
   kpiMiniVal: { fontSize: 26, fontWeight: 800, color: "#32363A" },
   kpiMiniLabel: { fontSize: 10, color: G.grayDk, marginTop: 2 },
-  weekNav: { display: "flex", gap: 8, marginTop: 16, paddingTop: 16, borderTop: "1px solid #EEE", flexWrap: "wrap" },
-  navBtn: { padding: "8px 16px", border: "1px solid #DEE2E6", borderRadius: 4, background: G.white, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#32363A" },
+  weekNav: { display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap", alignItems: "center" },
+  navBtn: { padding: "8px 16px", border: "1px solid #DEE2E6", borderRadius: 6, background: G.white, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "#32363A" },
   navBtnDisabled: { opacity: 0.35, cursor: "not-allowed", pointerEvents: "none" },
-  card: { background: G.white, border: "1px solid #DEE2E6", borderRadius: 4, marginBottom: 12 },
+  card: { background: G.white, border: "1px solid #DEE2E6", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", marginBottom: 12 },
   cardHeader: { padding: "12px 16px", borderBottom: "1px solid #DEE2E6", background: "#F5F6F7", display: "flex", alignItems: "center" },
   cardHeaderText: { fontSize: 14, fontWeight: 700, color: "#32363A" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "inherit" },
@@ -835,7 +1090,7 @@ const F = {
   input: { padding: "7px 12px", border: "1px solid #DEE2E6", borderRadius: 4, fontSize: 13, fontFamily: "inherit", flex: 1, minWidth: 100, outline: "none" },
   pill: { display: "inline-block", padding: "2px 8px", borderRadius: 4, background: "#E5F0FF", color: G.blue, fontWeight: 700, fontSize: 11, marginRight: 6 },
   statusBadge: { display: "inline-block", padding: "3px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700, marginLeft: 6, fontFamily: "inherit" },
-  primaryBtn: { padding: "8px 16px", border: "none", borderRadius: 4, background: G.blue, color: G.white, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  primaryBtn: { padding: "8px 16px", border: "none", borderRadius: 6, background: G.blue, color: G.white, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 1px 2px rgba(0,0,0,0.12)" },
   linkBtn: { background: "transparent", border: "none", color: G.blue, fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "4px 8px", fontFamily: "inherit" },
   footer: { textAlign: "center", padding: "20px 16px", fontSize: 11, color: G.grayMid, borderTop: "1px solid #DEE2E6", marginTop: 24, background: G.white },
 };
