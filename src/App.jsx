@@ -332,6 +332,11 @@ export default function App() {
                       {tab === t.id && <span>✓</span>}
                     </button>
                   ))}
+                  <div style={F.menuDivider} />
+                  <a href="/cepal-cluster/core-cepal.html" target="_blank" rel="noopener" onClick={() => setMenuOpen(false)} style={F.menuItemMuted}>
+                    <span>CORE · Guía</span>
+                    <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>
+                  </a>
                 </div>
               )}
             </div>
@@ -1067,6 +1072,8 @@ const F = {
   menuDropdown: { position: "absolute", top: 38, right: 0, background: G.white, border: "1px solid #DEE2E6", borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,0.14)", padding: 6, minWidth: 180, zIndex: 200 },
   menuItem: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "9px 12px", border: "none", background: "transparent", color: "#32363A", fontSize: 13, fontWeight: 600, cursor: "pointer", borderRadius: 6, fontFamily: "inherit", textAlign: "left" },
   menuItemActive: { color: G.red, background: "#FFF3F0" },
+  menuDivider: { height: 1, background: "#EEE", margin: "6px 4px" },
+  menuItemMuted: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "8px 12px", border: "none", background: "transparent", color: G.grayDk, fontSize: 12, fontWeight: 500, cursor: "pointer", borderRadius: 6, fontFamily: "inherit", textAlign: "left", textDecoration: "none", boxSizing: "border-box" },
   main: { maxWidth: 1200, margin: "0 auto", padding: "16px 20px" },
   objectHeader: { background: G.white, border: "1px solid #DEE2E6", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", padding: "20px 24px", marginBottom: 16 },
   objectHeaderTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 },

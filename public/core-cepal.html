@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CORE · Clúster CEPAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --giz-red:#D0111C;
+    --giz-red-dark:#A50E17;
+    --giz-slate:#5C7A8A;
+    --giz-slate-dark:#3E5865;
+    --page-bg:#F3F4F5;
+    --card-bg:#FFFFFF;
+    --border:#E1E3E5;
+    --border-strong:#CBCFD3;
+    --ink:#1C2733;
+    --ink-soft:#5B6670;
+    --ink-mute:#889198;
+    --green-bg:#E7F3E8;--green-fg:#2E7D35;--green-border:#BFE0C4;
+    --amber-bg:#FDF3DE;--amber-fg:#96690C;--amber-border:#F1DAA4;
+    --red-bg:#FBE7E8;--red-fg:#A5121E;--red-border:#F1C1C4;
+    --slate-bg:#EAF0F2;--slate-fg:#3E5865;
+    --radius:8px;
+    --sans:'Inter', -apple-system, 'Segoe UI', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  a{color:var(--giz-slate-dark);text-underline-offset:2px;}
+  a:hover{color:var(--giz-red-dark);}
+  body{margin:0;background:var(--page-bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:14px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 32px;scroll-margin-top:18px;}
+  @media(max-width:700px){.wrap{padding:0 18px;}}
+
+  /* TOP BAR */
+  .topbar{background:#fff;border-bottom:1px solid var(--border);}
+  .topbar-inner{display:flex;align-items:center;gap:20px;padding:12px 32px;max-width:1180px;margin:0 auto;}
+  .logo{display:flex;align-items:center;flex-shrink:0;}
+  .logo-img{height:32px;width:auto;display:block;}
+  .topbar-title{font-weight:600;font-size:15px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .spacer{flex:1;}
+  .search{
+    display:flex;align-items:center;gap:8px;background:var(--page-bg);border:1px solid var(--border);
+    border-radius:6px;padding:7px 12px;color:var(--ink-mute);font-size:13px;width:260px;flex-shrink:0;
+  }
+  .search:focus-within{border-color:var(--giz-slate);}
+  .search svg{flex-shrink:0;}
+  .search input{
+    border:none;background:transparent;outline:none;font-family:var(--sans);font-size:13px;
+    color:var(--ink);flex:1;min-width:0;padding:0;
+  }
+  .search input::placeholder{color:var(--ink-mute);}
+  .search-clear{
+    border:none;background:none;color:var(--ink-mute);cursor:pointer;font-size:16px;line-height:1;
+    width:20px;height:20px;padding:0;flex-shrink:0;display:none;align-items:center;justify-content:center;
+    border-radius:50%;
+  }
+  .search-clear:hover{background:var(--border);color:var(--ink);}
+  .search.has-value .search-clear{display:flex;}
+  .search-status{
+    font-size:12px;color:var(--ink-mute);white-space:nowrap;display:none;flex-shrink:0;
+  }
+  .search-status.visible{display:inline;}
+  @media(max-width:760px){
+    .topbar-inner{flex-wrap:wrap;row-gap:10px;padding:12px 18px;}
+    .spacer{display:none;}
+    .search{order:3;width:100%;}
+    .search-status{order:4;width:100%;}
+  }
+
+  /* TABS */
+  .tabbar{background:#fff;border-bottom:1px solid var(--border);}
+  .tabbar-inner{display:flex;gap:26px;max-width:1180px;margin:0 auto;padding:0 32px;overflow-x:auto;}
+  @media(max-width:700px){.tabbar-inner{padding:0 18px;}}
+  .tab{
+    padding:13px 2px;font-size:13.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;
+    border-bottom:2.5px solid transparent;cursor:pointer;text-decoration:none;
+  }
+  .tab.active{color:var(--giz-red);border-bottom-color:var(--giz-red);}
+  .tab:hover:not(.active){color:var(--ink);}
+
+  main{padding:32px 0 60px;}
+
+  h1.page-title{font-size:22px;font-weight:700;margin:0 0 4px;color:var(--ink);}
+  .page-sub{color:var(--ink-soft);font-size:14px;margin:0 0 28px;}
+
+  .section-label{font-size:16px;font-weight:700;margin:0 0 4px;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .section-sub{color:var(--ink-soft);font-size:13.5px;margin:0 0 16px;}
+  section{margin-bottom:44px;scroll-margin-top:18px;}
+  .read-time{font-size:11px;font-weight:600;color:var(--ink-mute);background:var(--page-bg);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap;}
+
+  /* CARD GRID */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;}
+  .grid.g4{grid-template-columns:repeat(4,1fr);}
+  .grid.g3{grid-template-columns:repeat(3,1fr);}
+  .grid.g2{grid-template-columns:repeat(2,1fr);}
+  @media(max-width:900px){.grid.g4,.grid.g3{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:560px){.grid.g4,.grid.g3,.grid.g2{grid-template-columns:1fr;}}
+
+  .card{
+    display:block;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px 20px;position:relative;transition:box-shadow .15s, border-color .15s;
+    text-decoration:none;color:inherit;
+  }
+  .card:hover{border-color:var(--border-strong);box-shadow:0 2px 8px rgba(28,39,51,0.06);}
+  .card-title{font-weight:600;font-size:14.5px;margin:0 0 5px;color:var(--ink);}
+  .card-desc{font-size:12.5px;color:var(--ink-soft);margin:0;}
+  .card-icon{
+    width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+    margin-top:14px;color:var(--giz-slate-dark);
+  }
+  .card-icon.red{color:var(--giz-red);}
+  .card-foot-note{color:var(--ink-mute);font-size:12px;margin:12px 2px 0;}
+  .badge{
+    position:absolute;top:16px;right:16px;font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:20px;
+  }
+  .badge.green{background:var(--green-bg);color:var(--green-fg);}
+  .badge.amber{background:var(--amber-bg);color:var(--amber-fg);}
+  .badge.red{background:var(--red-bg);color:var(--red-fg);}
+  .badge.slate{background:var(--slate-bg);color:var(--slate-fg);}
+
+  /* EXEC SUMMARY */
+  .exec-summary{background:#fff;border:1px solid var(--border);border-left:4px solid var(--giz-red);border-radius:var(--radius);margin-bottom:32px;overflow:hidden;}
+  .exec-summary summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 22px;cursor:pointer;font-weight:700;font-size:15px;color:var(--ink);}
+  .exec-summary summary::-webkit-details-marker{display:none;}
+  .exec-summary summary .chevron{flex-shrink:0;color:var(--ink-mute);transition:transform .2s;}
+  .exec-summary[open] summary .chevron{transform:rotate(180deg);}
+  .exec-summary-sub-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:0 22px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+  .exec-summary-sub{color:var(--ink-soft);font-size:13px;margin:0;}
+  .exec-summary-body{padding:20px 22px 22px;}
+  .exec-summary .card{background:var(--page-bg);}
+  .exec-summary .checklist li{font-size:13px;}
+  .print-btn{
+    display:flex;align-items:center;gap:7px;font-family:var(--sans);font-size:12.5px;font-weight:600;
+    padding:7px 14px;border-radius:20px;border:1px solid var(--border-strong);background:#fff;
+    color:var(--ink-soft);cursor:pointer;flex-shrink:0;transition:border-color .15s,color .15s;
+  }
+  .print-btn:hover{border-color:var(--giz-slate);color:var(--ink);}
+
+  @media print{
+    body.print-summary-only .topbar,
+    body.print-summary-only .tabbar,
+    body.print-summary-only .page-sub,
+    body.print-summary-only main > .wrap:not(#inicio),
+    body.print-summary-only #inicio > section,
+    body.print-summary-only footer,
+    body.print-summary-only .exec-summary .chevron,
+    body.print-summary-only .print-btn{display:none !important;}
+    body.print-summary-only .exec-summary{border:none;box-shadow:none;margin:0;}
+    body.print-summary-only .exec-summary summary{cursor:default;padding-left:0;}
+    body.print-summary-only .exec-summary-body{padding-left:0;padding-right:0;}
+    body.print-summary-only .exec-summary-sub-row{margin-left:0;}
+  }
+
+  /* ROLE TOGGLE */
+  .role-toggle{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+  .role-btn{
+    font-family:var(--sans);font-size:13px;font-weight:600;padding:8px 16px;
+    border-radius:20px;border:1px solid var(--border-strong);background:#fff;
+    color:var(--ink-soft);cursor:pointer;transition:all .15s;
+  }
+  .role-btn:hover{border-color:var(--giz-slate);}
+  .role-btn.active{background:var(--giz-red);border-color:var(--giz-red);color:#fff;}
+  .role-panel{display:none;}
+  .role-panel.active{display:block;animation:fade .2s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);}}
+  .role-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:22px 24px;}
+  .role-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+  .role-card h3{font-size:16px;font-weight:700;margin:0 0 4px;color:var(--ink);}
+  .role-tag{font-size:12px;color:var(--giz-slate-dark);font-weight:600;}
+  .checklist{list-style:none;margin:0;padding:0;}
+  .checklist li{
+    display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border);font-size:13.5px;color:var(--ink);
+  }
+  .checklist li:first-child{border-top:none;}
+  .check-icon{
+    width:17px;height:17px;border-radius:5px;border:1.5px solid var(--border-strong);flex-shrink:0;margin-top:1px;
+  }
+
+  /* CHIPS */
+  .chip-list{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{
+    display:inline-block;font-size:12.5px;font-weight:600;padding:7px 14px;border-radius:20px;
+    border:1px solid var(--border-strong);background:#fff;color:var(--ink-soft);
+  }
+
+  /* REFERENCE TABLE */
+  .ref-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .ref-table th,.ref-table td{padding:10px 16px;text-align:left;border-top:1px solid var(--border);}
+  .ref-table tr:first-child th, .ref-table tr:first-child td{border-top:none;}
+  .ref-table th{font-size:11px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-mute);background:var(--page-bg);}
+  .ref-table td{color:var(--ink);}
+  .ref-table code{background:var(--page-bg);padding:2px 6px;border-radius:4px;font-size:12.5px;}
+
+  /* CALLOUT */
+  .callout{border-radius:var(--radius);padding:14px 18px;font-size:13px;line-height:1.55;border:1px solid;}
+  .callout.warn{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber-fg);}
+  .callout.info{background:var(--slate-bg);border-color:var(--border-strong);color:var(--giz-slate-dark);}
+  .callout strong{color:inherit;}
+  .callout + .callout{margin-top:12px;}
+
+  /* FLOW */
+  .flow{display:flex;gap:0;align-items:stretch;flex-wrap:wrap;}
+  .flow-step{
+    flex:1;min-width:170px;background:#fff;border:1px solid var(--border);
+    border-radius:var(--radius);padding:18px 20px;
+  }
+  .flow-step + .flow-step{margin-left:14px;}
+  .flow-arrow{display:flex;align-items:center;color:var(--border-strong);font-size:18px;padding:0 6px;font-weight:700;}
+  @media(max-width:760px){
+    .flow{flex-direction:column;}
+    .flow-step + .flow-step{margin-left:0;margin-top:14px;}
+    .flow-arrow{transform:rotate(90deg);align-self:center;padding:4px 0;}
+  }
+  .flow-num{
+    width:24px;height:24px;border-radius:6px;background:var(--red-bg);color:var(--giz-red);
+    font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:10px;
+  }
+  .flow-title{font-weight:600;font-size:14.5px;margin:0 0 6px;color:var(--ink);}
+  .flow-desc{font-size:12.5px;color:var(--ink-soft);margin:0;}
+  .flow.compact .flow-step{padding:13px 14px;min-width:130px;}
+  .flow.compact .flow-title{font-size:13px;}
+  .flow.compact .flow-desc{font-size:11.5px;}
+
+  /* TIMELINE */
+  .tl{position:relative;padding-left:26px;}
+  .tl::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:1.5px;background:var(--border-strong);}
+  .tl-item{position:relative;padding-bottom:24px;}
+  .tl-item:last-child{padding-bottom:0;}
+  .tl-dot{position:absolute;left:-26px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--giz-slate);}
+  .tl-item.now .tl-dot{background:var(--giz-red);border-color:var(--giz-red);}
+  .tl-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:13px 18px;}
+  .tl-date{font-size:11.5px;color:var(--giz-red);font-weight:700;margin:0 0 3px;text-transform:uppercase;letter-spacing:0.02em;}
+  .tl-title{font-weight:600;font-size:14.5px;margin:0 0 3px;color:var(--ink);}
+  .tl-desc{font-size:12.5px;color:var(--ink-soft);margin:0;}
+
+  /* FAQ */
+  .faq-search{
+    width:100%;padding:10px 14px;border-radius:6px;border:1px solid var(--border-strong);
+    background:#fff;font-size:13.5px;font-family:var(--sans);color:var(--ink);margin-bottom:16px;
+  }
+  .faq-search:focus{outline:none;border-color:var(--giz-slate);}
+  .faq-cats{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .faq-cat{
+    font-size:12px;font-weight:600;padding:6px 13px;border-radius:20px;
+    border:1px solid var(--border-strong);background:#fff;color:var(--ink-soft);cursor:pointer;
+  }
+  .faq-cat.active{background:var(--giz-red);border-color:var(--giz-red);color:#fff;}
+  .faq-item{background:#fff;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;}
+  .faq-q{
+    display:flex;justify-content:space-between;align-items:center;gap:16px;
+    padding:14px 18px;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--ink);
+  }
+  .faq-plus{font-size:16px;color:var(--giz-red);flex-shrink:0;transition:transform .2s;font-weight:400;}
+  .faq-item.open .faq-plus{transform:rotate(45deg);}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+  .faq-item.open .faq-a{max-height:400px;}
+  .faq-a p{font-size:13px;color:var(--ink-soft);margin:0 0 16px;padding:0 18px;}
+  .faq-empty{color:var(--ink-soft);font-size:13.5px;padding:16px 2px;display:none;}
+  mark{background:#FDF3DE;color:inherit;border-radius:2px;padding:0 1px;}
+
+  /* SEMAFORO */
+  .lights{display:flex;gap:14px;flex-wrap:wrap;}
+  .light{flex:1;min-width:200px;border-radius:var(--radius);padding:16px 18px;border:1px solid;}
+  .light.g{background:var(--green-bg);border-color:var(--green-border);}
+  .light.y{background:var(--amber-bg);border-color:var(--amber-border);}
+  .light.r{background:var(--red-bg);border-color:var(--red-border);}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:7px;position:relative;top:-1px;}
+  .light.g .dot{background:var(--green-fg);}
+  .light.y .dot{background:var(--amber-fg);}
+  .light.r .dot{background:var(--red-fg);}
+  .light-title{font-weight:700;font-size:13px;margin:0 0 5px;}
+  .light.g .light-title{color:var(--green-fg);}
+  .light.y .light-title{color:var(--amber-fg);}
+  .light.r .light-title{color:var(--red-fg);}
+  .light-desc{font-size:12.5px;color:var(--ink-soft);margin:0;line-height:1.5;}
+
+  footer{padding:28px 0 50px;color:var(--ink-mute);font-size:12.5px;border-top:1px solid var(--border);margin-top:20px;}
+  footer a{color:var(--giz-slate-dark);}
+  .foot-line{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:20px;}
+
+  .gs-hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="logo">
+      <img src="data:image/png;base64,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" alt="GIZ WorkZone" class="logo-img">
+    </div>
+    <div class="topbar-title">CORE · Clúster CEPAL</div>
+    <div class="spacer"></div>
+    <span class="search-status" id="searchStatus"></span>
+    <div class="search" id="searchBox">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="globalSearch" placeholder="Buscar en esta guía…" autocomplete="off">
+      <button class="search-clear" id="searchClear" title="Limpiar búsqueda" aria-label="Limpiar búsqueda">×</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabbar">
+  <div class="tabbar-inner">
+    <a class="tab active" href="#inicio">Inicio</a>
+    <a class="tab" href="#como-funciona">Cómo funciona</a>
+    <a class="tab" href="#que-archivar">Qué archivar</a>
+    <a class="tab" href="#tu-rol">Roles y tareas</a>
+    <a class="tab" href="#aprendizaje">Aprendizaje</a>
+    <a class="tab" href="#timeline">Cronograma</a>
+    <a class="tab" href="#faq">Preguntas frecuentes</a>
+  </div>
+</div>
+
+<main>
+  <div class="wrap" id="inicio">
+
+    <h1 class="page-title">Bienvenido/a a CORE · Clúster CEPAL</h1>
+    <p class="page-sub">Guía interna sobre el nuevo sistema de archivo digital de GIZ: qué es, cómo se usa y qué le toca hacer a cada rol del clúster.</p>
+
+    <details class="exec-summary" open id="execSummary">
+      <summary>
+        <span>Resumen ejecutivo</span>
+        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="exec-summary-sub-row">
+        <p class="exec-summary-sub">Puntos clave de esta guía. Las secciones siguientes desarrollan cada uno con más detalle.</p>
+        <button type="button" class="print-btn" id="printSummaryBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Imprimir / guardar en PDF
+        </button>
+      </div>
+      <div class="exec-summary-body">
+        <div class="grid g3">
+          <div class="card gs-item">
+            <p class="card-title">En 3 fechas</p>
+            <ul class="checklist">
+              <li><span class="check-icon"></span><strong>Jul – Ago 2026</strong>: rollout de salas CORE (en curso).</li>
+              <li><span class="check-icon"></span><strong>Septiembre 2026</strong>: se apaga OpenText DMS.</li>
+              <li><span class="check-icon"></span><strong>Enero 2027</strong>: uso obligatorio de CORE.</li>
+            </ul>
+          </div>
+          <div class="card gs-item">
+            <p class="card-title">Qué te toca a ti, según tu rol</p>
+            <ul class="checklist">
+              <li><span class="check-icon"></span><strong>Autor:</strong> declara tus documentos como record, asigna metadatos y solicita el archivado.</li>
+              <li><span class="check-icon"></span><strong>Records Manager</strong> (Gloria Contreras, Pamela Martínez, César Sandino): revisa y aprueba cada solicitud.</li>
+              <li><span class="check-icon"></span><strong>Manager / Room Owner:</strong> nombra a los Records Managers y asegura que la sala se use para archivar.</li>
+            </ul>
+          </div>
+          <div class="card gs-item">
+            <p class="card-title">Riesgo de no actuar a tiempo</p>
+            <p class="card-desc">Sin un Records Manager activo, ninguna solicitud de archivado puede aprobarse. Desde enero 2027 todo expediente de proyecto debe archivarse en CORE. Su retención se cuenta desde el fin del proyecto (~10 años), así que un archivado tardío compromete la trazabilidad ante auditoría.</p>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <section>
+      <p class="section-label">Enlaces útiles e información para el clúster</p>
+      <p class="section-sub">Recursos oficiales de Records Management, GIZ.</p>
+      <div class="grid g3">
+        <a class="card gs-item" href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/CORE.aspx" target="_blank" rel="noopener">
+          <p class="card-title">CORE IDA page</p>
+          <p class="card-desc">Página oficial con toda la información y materiales de CORE.</p>
+          <div class="card-icon red">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+          </div>
+        </a>
+        <a class="card gs-item" href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/CORE-Schulungstermine.aspx" target="_blank" rel="noopener">
+          <p class="card-title">CORE Learning Path</p>
+          <p class="card-desc">Ruta de aprendizaje paso a paso, con videos y screencasts.</p>
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </div>
+        </a>
+        <a class="card gs-item" href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/FAQ.aspx" target="_blank" rel="noopener">
+          <p class="card-title">FAQ oficial CORE</p>
+          <p class="card-desc">Preguntas frecuentes actualizadas por el equipo de Records Management.</p>
+          <div class="card-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.82 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+        </a>
+      </div>
+      <p class="card-foot-note">Enlaces a la intranet GIZ (SharePoint); requieren sesión corporativa activa. El rol de Records Manager y otros permisos se solicitan por separado vía IAM Self Service.</p>
+    </section>
+
+    <section>
+      <p class="section-label">El sistema de semáforo de acceso</p>
+      <p class="section-sub">Así se decide quién puede ver cada documento archivado en CORE.</p>
+      <div class="lights">
+        <div class="light g">
+          <p class="light-title"><span class="dot"></span>Verde</p>
+          <p class="light-desc">Visible para todo el personal de GIZ. Ofertas, productos, informes de conocimiento.</p>
+        </div>
+        <div class="light y">
+          <p class="light-title"><span class="dot"></span>Amarillo</p>
+          <p class="light-desc">Visible solo para los miembros de la sala Teams del proyecto correspondiente.</p>
+        </div>
+        <div class="light r">
+          <p class="light-title"><span class="dot"></span>Rojo</p>
+          <p class="light-desc">Acceso restringido: solo el responsable (AV) y los Records Managers.</p>
+        </div>
+      </div>
+      <div class="callout info" style="margin-top:14px;">
+        <strong>Excepción al semáforo:</strong> algunos grupos tienen acceso permanente sin importar el color asignado: Corporate Security, Financial Counselling, Internal Control, Audit Coordination, Revisión/Auditoría interna y la Oficina de Records Management.
+      </div>
+    </section>
+
+  </div>
+
+  <div class="wrap" id="como-funciona">
+    <section>
+      <p class="section-label">Cómo funciona el archivado <span class="read-time">Lectura: ~2 min</span></p>
+      <p class="section-sub">Tres roles, un flujo simple. Así se archiva un documento en CORE, de principio a fin.</p>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-num">1</div>
+          <p class="flow-title">Autor</p>
+          <p class="flow-desc">Declara un documento como "record" (cambia el Content Type de "Document" a "Record"), le asigna los metadatos correctos y solicita su archivado.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-num">2</div>
+          <p class="flow-title">Records Manager</p>
+          <p class="flow-desc">Revisa la solicitud en la pestaña "Archiving requests" del canal "Records Management", verifica los metadatos y aprueba o rechaza.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-num">3</div>
+          <p class="flow-title">Archivo CORE</p>
+          <p class="flow-desc">El documento queda archivado de forma auditable, ya no se modifica y se vuelve buscable por metadatos.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-label">Estados de una solicitud de archivado</p>
+      <p class="section-sub">El asistente de metadatos guía al autor por un árbol de decisión (Proceso → Categoría/IOC → IOT) antes de solicitar el archivado. Una vez enviada la solicitud, pasa por estos estados:</p>
+      <div class="flow compact">
+        <div class="flow-step">
+          <p class="flow-title">Editable</p>
+          <p class="flow-desc">Documento con metadatos abiertos a corrección.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <p class="flow-title">Request Retention</p>
+          <p class="flow-desc">El autor solicita el archivado.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <p class="flow-title">In Process</p>
+          <p class="flow-desc">El Records Manager la está revisando.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <p class="flow-title">Approved</p>
+          <p class="flow-desc">Metadatos correctos, se aprueba.</p>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <p class="flow-title">Archived</p>
+          <p class="flow-desc">Queda archivado de forma inmutable.</p>
+        </div>
+      </div>
+      <div class="callout warn" style="margin-top:16px;">
+        <strong>Importante:</strong> en cuanto el autor cambia el estado a "Request Retention", los metadatos quedan bloqueados y ya no se pueden editar. Revísalos con cuidado antes de solicitar el archivado. Si el Records Manager rechaza la solicitud, el documento vuelve a estado editable para corregir y volver a intentarlo ("Check – Correct – Repeat").
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap" id="que-archivar">
+    <section>
+      <p class="section-label">Qué debe archivarse en CORE (y qué no) <span class="read-time">Lectura: ~2 min</span></p>
+      <p class="section-sub">CORE almacena únicamente registros digitales que no están ya mapeados en otro sistema corporativo. SAP S/4HANA sigue siendo el archivo primario para los procesos ya mapeados en SAP; OpenText DMS fue solo el origen de la migración, nunca un destino.</p>
+      <div class="lights">
+        <div class="light g gs-item">
+          <p class="light-title"><span class="dot"></span>Sí archivar en CORE</p>
+          <p class="light-desc">Expedientes de proyecto (records de los procesos K3 comisión / K4 implementación), informes de conocimiento, gestión de riesgos de seguridad, documentación de personal nacional/NMA y cualquier documento con obligación de retención que no esté ya mapeado en SAP.</p>
+        </div>
+        <div class="light r gs-item">
+          <p class="light-title"><span class="dot"></span>No archivar en CORE</p>
+          <p class="light-desc">Copias de documentos que ya existen en SAP S/4HANA o Mirai (no dupliques el archivado), borradores de trabajo sin obligación de retención, y archivos personales de trabajo (esos van a OneDrive, no a CORE).</p>
+        </div>
+      </div>
+
+      <div class="callout info" style="margin-top:16px;">
+        <strong>El "commissioning file" y el "project file" clásicos ya no existen como carpetas separadas.</strong> Su contenido documental relevante se integra como records de CORE, ligado a los procesos K3 (comisión) y K4 (implementación), bajo responsabilidad de AVV/AV. Más detalle en la <a href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/FAQ.aspx#9.-commissioning-project-management" target="_blank" rel="noopener">FAQ oficial, sección 9</a>.
+      </div>
+      <div class="callout info">
+        <strong>Periodo de retención:</strong> un expediente de proyecto se conserva aproximadamente 10 años, contados desde la fecha de <strong>fin</strong> del proyecto, no desde su creación.
+      </div>
+      <div class="callout info">
+        <strong>¿Proyecto "Digitalprojekt"?</strong> Si alguno de los proyectos del clúster está formalmente catalogado como proyecto digital ("Digitalprojekt"), las reglas de metadatos cambian: solo se asigna la categoría M7 y los campos "Topic" y "País socio" quedan en blanco. Confírmalo con tu Records Manager si no estás seguro. Para un proyecto de cooperación estándar, como los del clúster CEPAL, esto no aplica.
+      </div>
+    </section>
+
+    <section>
+      <p class="section-label">Formatos de número de proyecto</p>
+      <p class="section-sub">Referencia rápida de los identificadores usados como metadato al archivar.</p>
+      <table class="ref-table">
+        <tr><th>Tipo</th><th>Formato</th></tr>
+        <tr class="gs-item"><td>Oficina</td><td><code>B-XXXXXX</code></td></tr>
+        <tr class="gs-item"><td>Recursos Humanos</td><td><code>HR-B-XXXXXX</code></td></tr>
+        <tr class="gs-item"><td>Unidad de Servicio (SU)</td><td><code>P-XXXXXX</code></td></tr>
+        <tr class="gs-item"><td>Proyecto</td><td><code>G-XXXXXX</code> / <code>S-XXXXXX</code></td></tr>
+        <tr class="gs-item"><td>Oficina Ejecutora (OE)</td><td><code>U00XXXX</code></td></tr>
+      </table>
+    </section>
+  </div>
+
+  <div class="wrap" id="tu-rol">
+    <section>
+      <p class="section-label">Qué corresponde a cada rol <span class="read-time">Lectura: ~2 min</span></p>
+      <p class="section-sub">Selecciona un rol para ver sus responsabilidades específicas en CORE.</p>
+
+      <div class="role-toggle">
+        <button class="role-btn active" data-role="directora">Directora de clúster</button>
+        <button class="role-btn" data-role="recmgr">Records Manager</button>
+        <button class="role-btn" data-role="autor">Miembro de equipo (autor)</button>
+      </div>
+
+      <div class="role-panel active" data-panel="directora">
+        <div class="role-card">
+          <div class="role-card-head">
+            <div>
+              <h3>Directora / Manager de clúster</h3>
+              <p class="role-tag">Room Owner · Responsable de audit-proof archiving</p>
+            </div>
+          </div>
+          <ul class="checklist">
+            <li class="gs-item"><span class="check-icon"></span>Solicitar la sala CORE del clúster (si aún no existe) y asegurar que se use para archivar.</li>
+            <li class="gs-item"><span class="check-icon"></span>Nombrar y mantener actualizados a los Records Managers vía IAM Web Shop / IAM Self Service, y retirarlos cuando cambien de rol.</li>
+            <li class="gs-item"><span class="check-icon"></span>Gestionar la sala Teams como Room Owner: miembros, estructura, cierre al finalizar el proyecto.</li>
+            <li class="gs-item"><span class="check-icon"></span>Asegurar el cumplimiento de protección de datos bajo el principio "need-to-know".</li>
+            <li class="gs-item"><span class="check-icon"></span>Revisar periódicamente los records archivados de su unidad.</li>
+            <li class="gs-item"><span class="check-icon"></span>Completar "CORE Essentials for Managers" en la ruta de aprendizaje.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="role-panel" data-panel="recmgr">
+        <div class="role-card">
+          <div class="role-card-head">
+            <div>
+              <h3>Records Manager</h3>
+              <p class="role-tag">Gloria Contreras · Pamela Martínez · César Sandino · Acceso ampliado de lectura · Aprueba archivados</p>
+            </div>
+          </div>
+          <ul class="checklist">
+            <li class="gs-item"><span class="check-icon"></span>Revisar regularmente la pestaña "Archiving requests" (Pending / Approved / Rejected) del canal "Records Management" de la sala CORE.</li>
+            <li class="gs-item"><span class="check-icon"></span>Verificar cada solicitud de archivado campo por campo: metadatos obligatorios y opcionales, categoría e ID de proyecto correctos.</li>
+            <li class="gs-item"><span class="check-icon"></span>Aprobar o rechazar la solicitud (el rechazo con comentario aún está en desarrollo).</li>
+            <li class="gs-item"><span class="check-icon"></span>Recordar que el rol otorga acceso a información confidencial: usarlo con responsabilidad.</li>
+            <li class="gs-item"><span class="check-icon"></span>Completar el módulo "CORE for Records Managers" y los screencasts de revisión y aprobación.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="role-panel" data-panel="autor">
+        <div class="role-card">
+          <div class="role-card-head">
+            <div>
+              <h3>Miembro de equipo (autor)</h3>
+              <p class="role-tag">Crea y solicita el archivado de sus documentos</p>
+            </div>
+          </div>
+          <ul class="checklist">
+            <li class="gs-item"><span class="check-icon"></span>Identificar si un documento es un "record" sujeto a retención legal o de negocio.</li>
+            <li class="gs-item"><span class="check-icon"></span>Si ya está archivado en SAP o Mirai, no duplicar el archivado en CORE.</li>
+            <li class="gs-item"><span class="check-icon"></span>Asignar los metadatos correctos y solicitar el archivado al cerrar el proceso.</li>
+            <li class="gs-item"><span class="check-icon"></span>No modificar el documento una vez solicitado el archivado: los metadatos quedan bloqueados de inmediato.</li>
+            <li class="gs-item"><span class="check-icon"></span>Completar el módulo "CORE for All Users" en la ruta de aprendizaje.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-label">Otros grupos de permiso en salas CORE de proyectos</p>
+      <p class="section-sub">Además de los tres roles anteriores, un proyecto puede tener estos grupos de acceso adicionales vía IAM Self Service.</p>
+      <div class="chip-list">
+        <span class="chip gs-item">Project Lead</span>
+        <span class="chip gs-item">Records Manager Project</span>
+        <span class="chip gs-item">Country Director &amp; Head of Finance/Admin</span>
+        <span class="chip gs-item">Manager Contract &amp; Procurement</span>
+        <span class="chip gs-item">Manager Finance &amp; Controlling</span>
+        <span class="chip gs-item">Country Manager (HQ/LMI)</span>
+        <span class="chip gs-item">Head of SU &amp; RM SU</span>
+        <span class="chip gs-item">Manager SU</span>
+      </div>
+      <div class="callout info" style="margin-top:14px;">
+        <strong>Cómo solicitarlos:</strong> vía IAM Self Service, usando la convención de nombres del grupo correspondiente (por ejemplo <code>Records Manager Project [G-XXXXXX]</code>). Antes de pedir un permiso, revisa si ya eres miembro de la sala Teams del proyecto. Así evitas duplicar solicitudes.
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap" id="aprendizaje">
+    <section>
+      <p class="section-label">Ruta de aprendizaje CORE <span class="read-time">Referencia opcional</span></p>
+      <p class="section-sub">Seis pasos, de lo general a lo específico de tu rol y tu entorno de trabajo. <a href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/CORE-Schulungstermine.aspx" target="_blank" rel="noopener">Ver la ruta completa en IDA</a>.</p>
+      <div class="tl">
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 0 · ~15 min</p>
+            <p class="tl-title">Overview</p>
+            <p class="tl-desc">Video introductorio (12 min) + póster "CORE – Archiving made easy".</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 1</p>
+            <p class="tl-title">Understand the Basics</p>
+            <p class="tl-desc">Qué es un record, cuándo archivar, y FAQ de introducción.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 2</p>
+            <p class="tl-title">Metadata &amp; Structure</p>
+            <p class="tl-desc">Por qué importan los metadatos ("good metadata = good findability") y el principio de derechos de acceso.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 3</p>
+            <p class="tl-title">Understand the Process in Practice</p>
+            <p class="tl-desc">Screencast del proceso completo de archivado + guía paso a paso.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 4</p>
+            <p class="tl-title">Your Role in CORE</p>
+            <p class="tl-desc">Enfoque diferenciado para Usuarios, Records Managers y Managers.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 5</p>
+            <p class="tl-title">Deepen Knowledge by Role</p>
+            <p class="tl-desc">Elige tu entorno de trabajo: <a href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/CORE-Schulungstermine.aspx#.projects-digital-projects" target="_blank" rel="noopener"><strong>Projects &amp; project offers</strong></a> es el track para el clúster CEPAL (también existen Country Office, Service Units, HR, OE, Committees), con screencasts, guías, quick guides y ejemplos/role plays propios.</p>
+          </div>
+        </div>
+        <div class="tl-item now">
+          <div class="tl-dot"></div>
+          <div class="tl-card gs-item">
+            <p class="tl-date">Paso 6</p>
+            <p class="tl-title">Get Better, Faster</p>
+            <p class="tl-desc">Tour en vivo del entorno de prueba de CORE + video "Camera Action! CORE explained simply".</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p class="section-label">Screencasts de referencia</p>
+      <p class="section-sub">Videos cortos de Mona Orban (GIZ) para consultar en el momento en que los necesites.</p>
+      <div class="grid g3">
+        <div class="card gs-item">
+          <span class="badge slate">04:11</span>
+          <p class="card-title">Request Archiving</p>
+          <p class="card-desc">Cómo declarar un record, asignar metadatos y solicitar el archivado.</p>
+        </div>
+        <div class="card gs-item">
+          <span class="badge slate">04:18</span>
+          <p class="card-title">Review &amp; approval</p>
+          <p class="card-desc">Cómo revisar y aprobar/rechazar solicitudes como Records Manager.</p>
+        </div>
+        <div class="card gs-item">
+          <span class="badge slate">03:06</span>
+          <p class="card-title">Searching for records</p>
+          <p class="card-desc">Cómo buscar y filtrar documentos ya archivados por metadatos.</p>
+        </div>
+      </div>
+      <p class="card-foot-note">El material está organizado por caso de uso; el track "Projects &amp; Digital Projects" (codificado en azul) es el directamente relevante para el clúster CEPAL. <a href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/CORE-Schulungstermine.aspx#screencasts-and-guides-for-core" target="_blank" rel="noopener">Ver todos los screencasts en IDA</a>.</p>
+    </section>
+  </div>
+
+  <div class="wrap" id="timeline">
+    <section>
+      <p class="section-label">Cronograma <span class="read-time">Lectura: ~1 min</span></p>
+      <p class="section-sub">Qué está pasando ahora y qué viene después.</p>
+      <div class="tl">
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <p class="tl-date">Marzo – Septiembre 2026</p>
+            <p class="tl-title">Migración de DMS a SharePoint</p>
+            <p class="tl-desc">El proveedor técnico migra el contenido automáticamente en fases: no-records (jun–ago), records/archivos (jul–ago) y migración delta final (sept). No mover nada manualmente, salvo el espacio de trabajo personal. <a href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/DMS-Exit.aspx" target="_blank" rel="noopener">Más información del proyecto de migración</a>.</p>
+          </div>
+        </div>
+        <div class="tl-item now">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <p class="tl-date">Junio – Agosto 2026 · en curso</p>
+            <p class="tl-title">Roll-out de salas CORE</p>
+            <p class="tl-desc">Las salas Teams se van habilitando con funciones CORE. El clúster CEPAL ya solicitó los permisos de Records Manager (9/7/2026).</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <p class="tl-date">Mediados de julio 2026</p>
+            <p class="tl-title">Activación de permisos IAM</p>
+            <p class="tl-desc">Los grupos de Records Manager deberían quedar activos en el sistema de accesos.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <p class="tl-date">Septiembre 2026</p>
+            <p class="tl-title">DMS se desconecta</p>
+            <p class="tl-desc">OpenText DMS deja de estar disponible. Se abre el formulario para solicitar nuevas salas CORE.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot"></div>
+          <div class="tl-card">
+            <p class="tl-date">Enero 2027</p>
+            <p class="tl-title">Uso obligatorio de CORE</p>
+            <p class="tl-desc">A partir de esta fecha, todo archivado debe hacerse en CORE.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap" id="faq">
+    <section>
+      <p class="section-label">Preguntas frecuentes <span class="read-time">Consulta cuando la necesites</span></p>
+      <p class="section-sub">Basadas en las dudas más comunes recogidas por el equipo de Records Management de GIZ. <a href="https://gizonline.sharepoint.com/sites/group_1166/SitePages/Units/Unternehmensorganisation/Information%20Management/en-us/FAQ.aspx" target="_blank" rel="noopener">Ver la FAQ oficial completa en IDA</a>.</p>
+
+      <input type="text" class="faq-search" placeholder="Buscar una pregunta, por ejemplo: metadatos, migración, acceso…" id="faqSearch">
+      <div class="faq-cats" id="faqCats">
+        <button class="faq-cat active" data-cat="todas">Todas</button>
+        <button class="faq-cat" data-cat="acceso">Acceso y permisos</button>
+        <button class="faq-cat" data-cat="salas">Salas CORE</button>
+        <button class="faq-cat" data-cat="migracion">Migración DMS</button>
+        <button class="faq-cat" data-cat="proceso">Proceso de archivado</button>
+        <button class="faq-cat" data-cat="contenido">Qué archivar</button>
+      </div>
+
+      <div id="faqList">
+        <div class="faq-item" data-cat="acceso">
+          <div class="faq-q"><span>¿Quién tiene acceso a CORE?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Todo el personal de GIZ tiene acceso, pero con distintos niveles de permiso según su rol y los metadatos del documento (sistema de semáforo).</p></div>
+        </div>
+        <div class="faq-item" data-cat="acceso">
+          <div class="faq-q"><span>¿Los Country Managers necesitan ser miembros de la sala del proyecto para ver los records?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>No. El acceso se gestiona mediante grupos de permisos del archivo, independientemente de si son miembros de la sala Teams.</p></div>
+        </div>
+        <div class="faq-item" data-cat="acceso">
+          <div class="faq-q"><span>¿Pueden acceder socios externos a una sala CORE?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Sí, al espacio de colaboración en Teams si así se configuró. Pero nunca al archivo CORE, limitado a usuarios internos.</p></div>
+        </div>
+        <div class="faq-item" data-cat="acceso">
+          <div class="faq-q"><span>¿Hay grupos que puedan ver un documento sin importar el color de semáforo asignado?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Sí: Corporate Security, Financial Counselling, Internal Control, Audit Coordination, Revisión/Auditoría interna y la Oficina de Records Management tienen acceso permanente.</p></div>
+        </div>
+        <div class="faq-item" data-cat="acceso">
+          <div class="faq-q"><span>¿Cómo solicito el rol de Records Manager u otro grupo de permisos?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Vía IAM Self Service, usando la convención de nombres del grupo correspondiente (por ejemplo "Records Manager Project [G-XXXXXX]"). Revisa antes si ya eres miembro de la sala Teams del proyecto para no duplicar la solicitud.</p></div>
+        </div>
+        <div class="faq-item" data-cat="salas">
+          <div class="faq-q"><span>¿Puede haber más de una sala CORE por número de proyecto?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>No, solo una sala por número de identificación. Para clústeres o fondos se pueden pedir salas adicionales bajo el número del grupo.</p></div>
+        </div>
+        <div class="faq-item" data-cat="salas">
+          <div class="faq-q"><span>¿Qué pasa si el ícono CORE no aparece en la sala?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Indica un problema técnico. No archivar todavía: abrir un ticket ITSC (categoría "CORE") con nombre de sala, país/OU y número SAP.</p></div>
+        </div>
+        <div class="faq-item" data-cat="salas">
+          <div class="faq-q"><span>¿Cuándo estará disponible el formulario para pedir nuevas salas CORE?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Se espera que esté disponible en septiembre de 2026.</p></div>
+        </div>
+        <div class="faq-item" data-cat="migracion">
+          <div class="faq-q"><span>¿Debemos migrar manualmente los archivos de DMS?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>No, salvo el espacio de trabajo personal de cada persona. El resto lo migra automáticamente el equipo del proyecto de migración.</p></div>
+        </div>
+        <div class="faq-item" data-cat="migracion">
+          <div class="faq-q"><span>¿Qué pasa si faltan metadatos en un documento a migrar?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Puede requerir preparación adicional, pero no bloquea automáticamente la migración.</p></div>
+        </div>
+        <div class="faq-item" data-cat="migracion">
+          <div class="faq-q"><span>Tras la migración, ¿seguirán funcionando los enlaces antiguos de DMS?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Está en evaluación. Es posible que algunos enlaces dejen de funcionar; se estudian soluciones como redirecciones.</p></div>
+        </div>
+        <div class="faq-item" data-cat="proceso">
+          <div class="faq-q"><span>¿Cuándo se debe archivar un documento?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Idealmente una vez que el proceso al que pertenece ha finalizado (compra, evento, entregable).</p></div>
+        </div>
+        <div class="faq-item" data-cat="proceso">
+          <div class="faq-q"><span>¿Un Records Manager puede aprobar sus propias solicitudes?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Sí, aunque se recomienda separación de funciones cuando sea posible.</p></div>
+        </div>
+        <div class="faq-item" data-cat="proceso">
+          <div class="faq-q"><span>¿Cómo se busca información si ya no hay estructura de carpetas?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Por metadatos y filtros: número de proyecto, país, tipo de documento u otros números de referencia.</p></div>
+        </div>
+        <div class="faq-item" data-cat="proceso">
+          <div class="faq-q"><span>¿Puedo modificar los metadatos después de solicitar el archivado?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>No. En cuanto cambias el estado a "Request Retention" los metadatos quedan bloqueados. Revísalos con cuidado antes de solicitar el archivado.</p></div>
+        </div>
+        <div class="faq-item" data-cat="proceso">
+          <div class="faq-q"><span>¿Sigue existiendo el expediente de comisión ("commissioning file") o el project file?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>No como carpeta separada. Su contenido se integra como records de CORE vinculados a los procesos K3 (comisión) y K4 (implementación), bajo responsabilidad de AVV/AV.</p></div>
+        </div>
+        <div class="faq-item" data-cat="proceso">
+          <div class="faq-q"><span>¿Desde cuándo se cuenta el periodo de retención de un expediente de proyecto?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Desde la fecha de fin del proyecto, no desde su creación. El periodo típico es de aproximadamente 10 años.</p></div>
+        </div>
+        <div class="faq-item" data-cat="contenido">
+          <div class="faq-q"><span>¿Qué NO debo subir a CORE?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Documentos que ya existen en SAP S/4HANA o Mirai (no dupliques el archivado), borradores sin obligación de retención, y archivos personales de trabajo (esos van a OneDrive).</p></div>
+        </div>
+        <div class="faq-item" data-cat="contenido">
+          <div class="faq-q"><span>¿Qué sí debo archivar en CORE?</span><span class="faq-plus">+</span></div>
+          <div class="faq-a"><p>Records del proyecto no mapeados en otro sistema corporativo: expedientes ligados a los procesos K3/K4, informes de conocimiento, gestión de riesgos de seguridad y documentación de personal nacional/NMA.</p></div>
+        </div>
+      </div>
+      <p class="faq-empty" id="faqEmpty">No se encontraron preguntas con ese término. Prueba con otra palabra.</p>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <footer>
+      <div class="foot-line">
+        <span>Preparado para el clúster CEPAL a partir de la documentación oficial de Information Management, GIZ.</span>
+        <span>¿Dudas o problemas técnicos? <a href="mailto:records-management@giz.de">records-management@giz.de</a> · para incidencias con la sala CORE, abre un ticket ITSC (categoría "CORE") con nombre de sala, país/OU y número SAP.</span>
+      </div>
+    </footer>
+  </div>
+</main>
+
+<script>
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.role-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.role-panel').forEach(p=>{p.classList.remove('active');p.style.display='';});
+      btn.classList.add('active');
+      document.querySelector('.role-panel[data-panel="'+btn.dataset.role+'"]').classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.faq-q').forEach(q=>{
+    q.addEventListener('click',()=>{
+      q.parentElement.classList.toggle('open');
+    });
+  });
+
+  const cats = document.querySelectorAll('.faq-cat');
+  const faqItems = document.querySelectorAll('.faq-item');
+  const faqSearch = document.getElementById('faqSearch');
+  const faqEmpty = document.getElementById('faqEmpty');
+  let activeCat = 'todas';
+
+  function normalize(s){
+    return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  }
+
+  function filterFaq(){
+    const term = normalize(faqSearch.value.trim());
+    let visible = 0;
+    faqItems.forEach(item=>{
+      const matchesCat = activeCat==='todas' || item.dataset.cat===activeCat;
+      const text = normalize(item.querySelector('.faq-q span').textContent + ' ' + item.querySelector('.faq-a p').textContent);
+      const matchesTerm = term==='' || text.includes(term);
+      const show = matchesCat && matchesTerm;
+      item.style.display = show ? '' : 'none';
+      if(show) visible++;
+    });
+    faqEmpty.style.display = visible===0 ? 'block' : 'none';
+    return visible;
+  }
+
+  cats.forEach(cat=>{
+    cat.addEventListener('click',()=>{
+      cats.forEach(c=>c.classList.remove('active'));
+      cat.classList.add('active');
+      activeCat = cat.dataset.cat;
+      filterFaq();
+    });
+  });
+  faqSearch.addEventListener('input', filterFaq);
+
+  /* ---- Global search across the whole guide ---- */
+  const globalSearch = document.getElementById('globalSearch');
+  const searchBox = document.getElementById('searchBox');
+  const searchClear = document.getElementById('searchClear');
+  const searchStatus = document.getElementById('searchStatus');
+  const gsItems = ()=>document.querySelectorAll('.gs-item');
+
+  function resetRolePanels(){
+    document.querySelectorAll('.role-panel').forEach(p=>{p.style.display='';});
+  }
+
+  function runGlobalSearch(){
+    const raw = globalSearch.value.trim();
+    const term = normalize(raw);
+    searchBox.classList.toggle('has-value', raw !== '');
+
+    faqSearch.value = raw;
+    const faqVisible = filterFaq();
+
+    if(term===''){
+      gsItems().forEach(el=>{el.style.display='';});
+      document.querySelectorAll('.role-panel').forEach(p=>p.style.display='');
+      resetRolePanels();
+      searchStatus.classList.remove('visible');
+      searchStatus.textContent='';
+      return;
+    }
+
+    let matchCount = 0;
+    gsItems().forEach(el=>{
+      const match = normalize(el.textContent).includes(term);
+      el.style.display = match ? '' : 'none';
+      if(match) matchCount++;
+    });
+
+    document.querySelectorAll('.role-panel').forEach(p=>{
+      const items = p.querySelectorAll('.gs-item');
+      const anyVisible = items.length===0 || [...items].some(li=>li.style.display!=='none');
+      p.style.display = anyVisible ? 'block' : 'none';
+    });
+
+    const total = matchCount + faqVisible;
+    searchStatus.classList.add('visible');
+    searchStatus.textContent = total===0 ? 'Sin resultados para “'+raw+'”' : total+' resultado(s) para “'+raw+'”';
+
+    if(total>0){
+      const firstMatch = document.querySelector('.gs-item:not([style*="display: none"])') ||
+                          document.querySelector('#faqList .faq-item:not([style*="display: none"])');
+      if(firstMatch) firstMatch.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }
+
+  /* ---- Print / save exec summary as PDF ---- */
+  const printSummaryBtn = document.getElementById('printSummaryBtn');
+  if(printSummaryBtn){
+    printSummaryBtn.addEventListener('click', ()=>{
+      document.getElementById('execSummary').open = true;
+      document.body.classList.add('print-summary-only');
+      window.print();
+    });
+    window.addEventListener('afterprint', ()=>{
+      document.body.classList.remove('print-summary-only');
+    });
+  }
+
+  globalSearch.addEventListener('input', runGlobalSearch);
+  globalSearch.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){ globalSearch.value=''; runGlobalSearch(); globalSearch.blur(); }
+  });
+  searchClear.addEventListener('click', ()=>{
+    globalSearch.value='';
+    runGlobalSearch();
+    globalSearch.focus();
+  });
+</script>
+
+</body>
+</html>
