@@ -1,5 +1,5 @@
 -- ============================================
--- Registro Asistencia Clúster CEPAL
+-- Registro Asistencia Clúster CEPAL-DEK
 -- Schema completo (con soporte AM/PM)
 -- ============================================
 

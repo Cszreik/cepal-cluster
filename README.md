@@ -1,4 +1,4 @@
-# Registro de Asistencia — Clúster CEPAL v2
+# Registro de Asistencia — Clúster CEPAL-DEK v2
 
 ## Instrucciones desde cero
 

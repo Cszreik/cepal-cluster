@@ -313,7 +313,7 @@ export default function App() {
             )}
             <div>
               <div style={F.shellTitle}>{sectionLabel}</div>
-              <div style={F.shellSub}>Clúster CEPAL · Av. Dag Hammarskjöld 3477</div>
+              <div style={F.shellSub}>Clúster CEPAL-DEK · Av. Dag Hammarskjöld 3477</div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
