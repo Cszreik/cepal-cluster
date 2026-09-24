@@ -169,7 +169,33 @@ function useDB() {
     } catch (e) { setError(e.message); } finally { setLoading(false); }
   }, []);
 
+  // Recarga silenciosa (sin pantalla de carga) tras guardar o al volver a la pestaña
+  const refresh = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    const [p, d, a, h] = await Promise.all([
+      supabase.from("people").select("*").order("created_at"),
+      supabase.from("desks").select("*").order("sort_order"),
+      supabase.from("attendance").select("*"),
+      supabase.from("holidays").select("*").order("date"),
+    ]);
+    if (p.data) setPeople(p.data);
+    if (d.data) setDesks(d.data);
+    if (a.data) setAttendance(a.data);
+    if (h.data) setHolidays(h.data);
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+
+  // Si la pestaña estuvo en segundo plano, el canal realtime pudo cortarse y perder eventos
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [refresh]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -182,11 +208,11 @@ function useDB() {
         supabase.from("attendance").select("*").then(r => r.data && setAttendance(r.data)))
       .on("postgres_changes", { event: "*", schema: "public", table: "holidays" }, () =>
         supabase.from("holidays").select("*").order("date").then(r => r.data && setHolidays(r.data)))
-      .subscribe();
+      .subscribe(status => { if (status === "SUBSCRIBED") refresh(); });
     return () => supabase.removeChannel(ch);
-  }, []);
+  }, [refresh]);
 
-  return { people, desks, attendance, holidays, loading, error };
+  return { people, desks, attendance, holidays, loading, error, refresh };
 }
 
 export default function App() {
@@ -385,7 +411,7 @@ function OfficeHover({ name }) {
 }
 /* ═══ REGISTRO ═══ */
 function RegistroTab({ db, currentWeek, setCurrentWeek }) {
-  const { people, desks, attendance, holidays } = db;
+  const { people, desks, attendance, holidays, refresh } = db;
   const notify = useToast();
   const { prompt: promptDialog } = useDialog();
   const [saving, setSaving] = useState(false);
@@ -447,6 +473,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
         notify(`${who ? who.initials : "Persona"} · ${DAYS[dayIdx]} ${period} guardado`);
       }
     } catch (e) { console.error(e); notify("No se pudo guardar", "error"); }
+    await refresh();
     setSaving(false);
   };
 
@@ -459,6 +486,7 @@ function RegistroTab({ db, currentWeek, setCurrentWeek }) {
     const { error } = await supabase.from("attendance").update({ notes: note })
       .eq("week_key", currentWeek).eq("day_index", dayIdx)
       .eq("desk_id", deskId).eq("period", period);
+    await refresh();
     if (error) notify("No se pudo guardar la nota", "error");
     else notify(note.trim() ? "Nota guardada" : "Nota eliminada", "info");
   };
@@ -789,7 +817,7 @@ function DashboardTab({ db }) {
 
 /* ═══ CONFIG ═══ */
 function ConfigTab({ db }) {
-  const { people, desks, holidays } = db;
+  const { people, desks, holidays, refresh } = db;
   const notify = useToast();
   const { confirm: confirmDialog, prompt: promptDialog } = useDialog();
 
@@ -810,18 +838,21 @@ function ConfigTab({ db }) {
     if (!nP.initials || !nP.name) return;
     setBusyP(true);
     const { error } = await supabase.from("people").insert({ initials: nP.initials, name: nP.name, area: nP.area, active: true });
+    await refresh();
     if (error) notify("No se pudo agregar la persona", "error");
     else notify(`${nP.name} agregado`);
     setNP({ initials: "", name: "", area: "" }); setShowAddPerson(false); setBusyP(false);
   };
   const togglePerson = async (id, a) => {
     await supabase.from("people").update({ active: !a }).eq("id", id);
+    await refresh();
     notify(a ? "Persona desactivada" : "Persona activada", "info");
   };
   const removePerson = async (id) => {
     const p = people.find(x => x.id === id);
     if (!(await confirmDialog(`Se eliminará ${p ? p.name : "esta persona"} de forma permanente.`, { danger: true, title: "¿Eliminar persona?" }))) return;
     const { error } = await supabase.from("people").delete().eq("id", id);
+    await refresh();
     notify(error ? "No se pudo eliminar" : "Persona eliminada", error ? "error" : "info");
   };
 
@@ -831,17 +862,20 @@ function ConfigTab({ db }) {
     setBusyD(true);
     const maxSort = desks.length > 0 ? Math.max(...desks.map(d => d.sort_order || 0)) + 1 : 1;
     const { error } = await supabase.from("desks").insert({ office: nD.office, desk: nD.desk, status: "available", sort_order: maxSort });
+    await refresh();
     if (error) notify("No se pudo agregar el escritorio", "error");
     else notify(`${nD.office} · ${nD.desk} agregado`);
     setND({ office: "", desk: "" }); setShowAddDesk(false); setBusyD(false);
   };
   const cycleDesk = async (id, s) => {
     await supabase.from("desks").update({ status: s === "available" ? "reserved" : s === "reserved" ? "maintenance" : "available" }).eq("id", id);
+    await refresh();
   };
   const removeDesk = async (id) => {
     const d = desks.find(x => x.id === id);
     if (!(await confirmDialog(`Se eliminará ${d ? `${d.office} · ${d.desk}` : "este escritorio"} de forma permanente.`, { danger: true, title: "¿Eliminar escritorio?" }))) return;
     const { error } = await supabase.from("desks").delete().eq("id", id);
+    await refresh();
     notify(error ? "No se pudo eliminar" : "Escritorio eliminado", error ? "error" : "info");
   };
   const renameDesk = async (id, field) => {
@@ -852,6 +886,7 @@ function ConfigTab({ db }) {
     const val = await promptDialog(`${label}:`, current, { title: "Editar" });
     if (val === null || val === current || !val.trim()) return;
     const { error } = await supabase.from("desks").update({ [field]: val.trim() }).eq("id", id);
+    await refresh();
     notify(error ? "No se pudo guardar" : "Cambio guardado", error ? "error" : "info");
   };
   const moveDesk = async (id, direction) => {
@@ -863,6 +898,7 @@ function ConfigTab({ db }) {
       supabase.from("desks").update({ sort_order: b.sort_order }).eq("id", a.id),
       supabase.from("desks").update({ sort_order: a.sort_order }).eq("id", b.id),
     ]);
+    await refresh();
   };
 
   // Holiday CRUD
@@ -870,6 +906,7 @@ function ConfigTab({ db }) {
     if (!nH.date || !nH.name) return;
     setBusyH(true);
     const { error } = await supabase.from("holidays").insert({ date: nH.date, name: nH.name, block_am: nH.block_am, block_pm: nH.block_pm });
+    await refresh();
     if (error) notify("No se pudo agregar el feriado", "error");
     else notify(`Feriado "${nH.name}" agregado`);
     setNH({ date: "", name: "", block_am: true, block_pm: true }); setShowAddHoliday(false); setBusyH(false);
@@ -878,6 +915,7 @@ function ConfigTab({ db }) {
     const h = holidays.find(x => x.id === id);
     if (!(await confirmDialog(`Se eliminará el feriado ${h ? `"${h.name}"` : ""} de forma permanente.`, { danger: true, title: "¿Eliminar feriado?" }))) return;
     const { error } = await supabase.from("holidays").delete().eq("id", id);
+    await refresh();
     notify(error ? "No se pudo eliminar" : "Feriado eliminado", error ? "error" : "info");
   };
   const toggleHolidayPeriod = async (id, field) => {
@@ -886,6 +924,7 @@ function ConfigTab({ db }) {
     const newVal = !h[field];
     if (!newVal && !h[field === "block_am" ? "block_pm" : "block_am"]) return; // must block at least one
     await supabase.from("holidays").update({ [field]: newVal }).eq("id", id);
+    await refresh();
   };
 
   const stM = { available: { l: "Disponible", bg: "#E8F5E9", c: G.green }, reserved: { l: "Reservado", bg: "#FFF3F0", c: G.red }, maintenance: { l: "Mantención", bg: G.yellowBg, c: "#8A6D00" } };
