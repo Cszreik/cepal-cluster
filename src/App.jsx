@@ -142,6 +142,20 @@ function DialogHost({ dialog, onClose }) {
   );
 }
 
+// Supabase devuelve como máximo 1000 filas por consulta; attendance crece cada semana,
+// así que se trae por páginas para no perder los registros más nuevos.
+async function fetchAllAttendance() {
+  const PAGE = 1000;
+  const all = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase.from("attendance").select("*")
+      .order("created_at").order("id").range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    all.push(...data);
+    if (data.length < PAGE) return { data: all, error: null };
+  }
+}
+
 function useDB() {
   const [people, setPeople] = useState([]);
   const [desks, setDesks] = useState([]);
@@ -160,7 +174,7 @@ function useDB() {
       const [p, d, a, h] = await Promise.all([
         supabase.from("people").select("*").order("created_at"),
         supabase.from("desks").select("*").order("sort_order"),
-        supabase.from("attendance").select("*"),
+        fetchAllAttendance(),
         supabase.from("holidays").select("*").order("date"),
       ]);
       const firstError = p.error || d.error || a.error || h.error;
@@ -175,7 +189,7 @@ function useDB() {
     const [p, d, a, h] = await Promise.all([
       supabase.from("people").select("*").order("created_at"),
       supabase.from("desks").select("*").order("sort_order"),
-      supabase.from("attendance").select("*"),
+      fetchAllAttendance(),
       supabase.from("holidays").select("*").order("date"),
     ]);
     if (p.data) setPeople(p.data);
@@ -205,7 +219,7 @@ function useDB() {
       .on("postgres_changes", { event: "*", schema: "public", table: "desks" }, () =>
         supabase.from("desks").select("*").order("sort_order").then(r => r.data && setDesks(r.data)))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () =>
-        supabase.from("attendance").select("*").then(r => r.data && setAttendance(r.data)))
+        fetchAllAttendance().then(r => r.data && setAttendance(r.data)))
       .on("postgres_changes", { event: "*", schema: "public", table: "holidays" }, () =>
         supabase.from("holidays").select("*").order("date").then(r => r.data && setHolidays(r.data)))
       .subscribe(status => { if (status === "SUBSCRIBED") refresh(); });
