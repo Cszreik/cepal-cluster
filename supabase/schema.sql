@@ -28,6 +28,7 @@ CREATE TABLE attendance (
   desk_id UUID NOT NULL REFERENCES desks(id) ON DELETE CASCADE,
   person_id UUID NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   period TEXT NOT NULL DEFAULT 'AM' CHECK (period IN ('AM', 'PM')),
+  notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(week_key, day_index, desk_id, period)
@@ -93,3 +94,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE people;
 ALTER PUBLICATION supabase_realtime ADD TABLE desks;
 ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
 ALTER PUBLICATION supabase_realtime ADD TABLE holidays;
+
+-- Migración para bases creadas antes de que existiera la columna de notas
+-- (ejecutar una vez en el SQL Editor si "Nota" da error al guardar):
+-- ALTER TABLE attendance ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
